@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { loadGoogleMapsApi } from "../lib/googleMaps";
 
 type PlanningSource = {
   label: string;
   url: string;
+};
+
+type ComparableLandAreaSource = {
+  source: string;
+  value: number | null;
+  method?: "manual" | "geometry" | "attribute" | "derived";
+  notes?: string;
 };
 
 type SiteMetric = {
@@ -86,6 +93,8 @@ type ComparableSale = {
   longitude?: number;
   landAreaSquareMeters?: number | null;
   source: PlanningSource;
+  landAreaStatus?: "verified" | "estimated" | "conflict" | "missing";
+  landAreaSources?: ComparableLandAreaSource[];
 };
 
 type DevelopmentActivity = {
@@ -226,25 +235,144 @@ const numberFormatter = new Intl.NumberFormat("en-AU", {
   maximumFractionDigits: 0
 });
 
+const formatLandAreaStatus = (status?: ComparableSale["landAreaStatus"]) => {
+  switch (status) {
+    case "verified":
+      return { label: "Verified", bg: "#dcfce7", fg: "#166534" };
+    case "estimated":
+      return { label: "Estimated", bg: "#fef9c3", fg: "#92400e" };
+    case "conflict":
+      return { label: "Conflict", bg: "#fee2e2", fg: "#b91c1c" };
+    case "missing":
+      return { label: "Missing", bg: "#e5e7eb", fg: "#374151" };
+    default:
+      return null;
+  }
+};
+
+const formatLandAreaSource = (source: ComparableLandAreaSource) => {
+  const valueLabel =
+    source.value !== null && source.value !== undefined
+      ? `${numberFormatter.format(source.value)} m²`
+      : "N/A";
+  const methodLabel = source.method ? ` (${source.method})` : "";
+  const notesLabel = source.notes ? ` – ${source.notes}` : "";
+  return `${source.source}: ${valueLabel}${methodLabel}${notesLabel}`;
+};
+
+const interpretMapsLoaderError = (error: unknown): string => {
+  const rawMessage =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+      ? error.message
+      : "Failed to load Google Maps.";
+  if (!rawMessage) {
+    return "Failed to load Google Maps.";
+  }
+
+  if (rawMessage.includes("RefererNotAllowedMapError")) {
+    return "Google Maps API rejected the request because the current domain is not in the allowed HTTP referrers list.";
+  }
+  if (rawMessage.includes("ApiNotActivatedMapError")) {
+    return "Enable the Maps JavaScript API for this key in Google Cloud Console.";
+  }
+  if (rawMessage.includes("InvalidKeyMapError")) {
+    return "The provided Google Maps API key is invalid or has been deleted.";
+  }
+  if (rawMessage.includes("BillingNotEnabledMapError")) {
+    return "Billing is not enabled for this Google Maps project. Enable billing to unlock interactive maps.";
+  }
+  if (rawMessage.includes("OverQuotaMapError")) {
+    return "Google Maps daily quota exceeded. Wait or request a higher quota.";
+  }
+
+  return rawMessage;
+};
+
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
-const glossaryEntries: Array<{ term: string; definition: string }> = [
-  { term: "Apartment Design Guide (ADG)", definition: "Apartment Design Guide" },
-  { term: "AS2890", definition: "Australian Standard 2890 (Parking Facilities)" },
-  { term: "Building Sustainability Index (BASIX)", definition: "Building Sustainability Index" },
-  { term: "Complying Development Certificate (CDC)", definition: "Complying Development Certificate" },
-  { term: "Development Application (DA)", definition: "Development Application" },
-  { term: "DCP", definition: "Development Control Plan" },
-  { term: "Floor Space Ratio (FSR)", definition: "Floor Space Ratio" },
-  { term: "Housing Diversity Amendment (HDA)", definition: "Housing Diversity Amendment" },
-  { term: "HOB", definition: "Height of Buildings" },
-  { term: "LGA", definition: "Local Government Area" },
-  { term: "Low and Mid-Rise (LMR)", definition: "Low and Mid-Rise housing program" },
-  { term: "National Construction Code (NCC)", definition: "National Construction Code" },
-  { term: "SEPP", definition: "State Environmental Planning Policy" },
-  { term: "State Significant Development (SSD)", definition: "State Significant Development" },
-  { term: "Transport Oriented Development (TOD)", definition: "Transport Oriented Development" },
-  { term: "Voluntary Planning Agreement (VPA)", definition: "Voluntary Planning Agreement" }
+const glossaryEntries: Array<{ term: string; definition: string; url?: string }> = [
+  {
+    term: "Apartment Design Guide (ADG)",
+    definition: "NSW Apartment Design Guide (2023)",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy/apartment-design-guide"
+  },
+  {
+    term: "AS2890",
+    definition: "Australian Standard 2890 (Parking Facilities)",
+    url: "https://www.standards.org.au/standards-catalogue/sa/snz/building/bd-062/as-2890-1-2020"
+  },
+  {
+    term: "Building Sustainability Index (BASIX)",
+    definition: "NSW BASIX sustainability assessment",
+    url: "https://www.planningportal.nsw.gov.au/basix"
+  },
+  {
+    term: "Complying Development Certificate (CDC)",
+    definition: "Fast-track approval for low-impact development",
+    url: "https://www.planningportal.nsw.gov.au/online-applications/complying-development"
+  },
+  {
+    term: "Development Application (DA)",
+    definition: "Formal application for development consent",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/development-assessment"
+  },
+  {
+    term: "DCP",
+    definition: "Development Control Plan",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/development-control-plans"
+  },
+  {
+    term: "Floor Space Ratio (FSR)",
+    definition: "Ratio of gross floor area to site area",
+    url: "https://www.planningportal.nsw.gov.au/supporting-documents/floor-space-ratio"
+  },
+  {
+    term: "Housing Diversity Amendment (HDA)",
+    definition: "Housing SEPP - Housing Diversity Amendment",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy"
+  },
+  {
+    term: "HOB",
+    definition: "Height of Buildings control",
+    url: "https://www.planningportal.nsw.gov.au/supporting-documents/height-of-buildings"
+  },
+  {
+    term: "LGA",
+    definition: "Local Government Area",
+    url: "https://www.olg.nsw.gov.au/what-is-local-government/local-government-areas/"
+  },
+  {
+    term: "Low and Mid-Rise (LMR)",
+    definition: "NSW Low and Mid-Rise Housing program",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy"
+  },
+  {
+    term: "National Construction Code (NCC)",
+    definition: "Australian building and plumbing code",
+    url: "https://www.abcb.gov.au/national-construction-code"
+  },
+  {
+    term: "SEPP",
+    definition: "State Environmental Planning Policy",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/state-environmental-planning-policies"
+  },
+  {
+    term: "State Significant Development (SSD)",
+    definition: "Projects assessed as State Significant Development",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/state-significant-development"
+  },
+  {
+    term: "Transport Oriented Development (TOD)",
+    definition: "NSW Transport Oriented Development program",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/housing/transport-oriented-development-program"
+  },
+  {
+    term: "Voluntary Planning Agreement (VPA)",
+    definition: "Voluntary Planning Agreement with councils",
+    url: "https://www.planning.nsw.gov.au/policy-and-legislation/special-contributions/voluntary-planning-agreements"
+  }
 ];
 
 const formatPlanningStatusLabel = (rawStatus?: string) => {
@@ -390,23 +518,45 @@ export default function AddressSearch() {
   const [error, setError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [mapsReady, setMapsReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
 
   useEffect(() => {
-    if (!GOOGLE_MAPS_KEY || typeof window === "undefined") {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (!GOOGLE_MAPS_KEY) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[AddressSearch] NEXT_PUBLIC_GOOGLE_MAPS_KEY is missing. Falling back to static imagery."
+        );
+      }
       return;
     }
 
     let cancelled = false;
 
+    setMapError(null);
+
     loadGoogleMapsApi(GOOGLE_MAPS_KEY, ["places"])
       .then(() => {
-        if (!cancelled) setMapsReady(true);
+        if (cancelled) return;
+        setMapsReady(true);
+        setMapError(null);
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[AddressSearch] Google Maps API loaded successfully.");
+        }
       })
-      .catch(() => {
-        if (!cancelled) setMapsReady(false);
+      .catch((error) => {
+        if (cancelled) return;
+        setMapsReady(false);
+        setMapError(interpretMapsLoaderError(error));
+        if (process.env.NODE_ENV !== "production") {
+          console.error("[AddressSearch] Failed to load Google Maps API.", error);
+        }
       });
 
     return () => {
@@ -520,18 +670,25 @@ export default function AddressSearch() {
         </datalist>
       )}
 
+      {mapError && (
+        <p style={{ color: "#b91c1c", margin: 0, fontSize: "0.85rem" }}>
+          Google Maps API error: {mapError} Fallback imagery will be used.
+        </p>
+      )}
+
       {error && <p style={{ color: "red", margin: 0 }}>{error}</p>}
 
-      {result && <ResultDisplay result={result} mapsReady={mapsReady} />}
+      {result && <ResultDisplay result={result} mapsReady={mapsReady} mapError={mapError} />}
     </div>
   );
 }
 type ResultDisplayProps = {
   result: PlanningResult;
   mapsReady: boolean;
+  mapError: string | null;
 };
 
-function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
+function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
   const {
     site,
     planningOptions,
@@ -690,7 +847,7 @@ function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
         margin: "0 auto"
       }}
     >
-      <MapImagery site={site} mapsReady={mapsReady} />
+      <MapImagery site={site} mapsReady={mapsReady} mapError={mapError} />
 
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
@@ -840,7 +997,12 @@ function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
           </p>
         </div>
 
-        <ComparableSalesMap site={site} comparables={comparableSales} mapsReady={mapsReady} />
+        <ComparableSalesMap
+          site={site}
+          comparables={comparableSales}
+          mapsReady={mapsReady}
+          mapError={mapError}
+        />
 
         <div style={{ display: "grid", gap: "1.5rem" }}>
           <div
@@ -876,7 +1038,6 @@ function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
                   <thead>
                     <tr style={{ backgroundColor: "#f1f5f9" }}>
                       <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569", fontSize: "0.75rem" }}>#</th>
-                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569", fontSize: "0.75rem" }}>Address</th>
                       <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569", fontSize: "0.75rem" }}>Type</th>
                       <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569", fontSize: "0.75rem" }}>Sale date</th>
                       <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569", fontSize: "0.75rem" }}>Price</th>
@@ -910,32 +1071,81 @@ function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
                           : "N/A";
 
                       return (
-                        <tr key={sale.address + sale.saleDate} style={{ borderTop: "1px solid #e2e8f0" }}>
-                          <td style={{ padding: "0.6rem", color: "#334155" }}>{index + 1}</td>
-                          <td style={{ padding: "0.6rem", color: "#0f172a", fontWeight: 600 }}>
-                            <div>{sale.address}</div>
-                            {sale.comment && (
-                              <div style={{ color: "#64748b", fontSize: "0.8rem", marginTop: "0.2rem" }}>
-                                {sale.comment}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ padding: "0.6rem", color: "#475569" }}>{sale.type}</td>
-                          <td style={{ padding: "0.6rem", color: "#475569" }}>{saleDateLabel}</td>
-                          <td style={{ padding: "0.6rem", color: "#475569" }}>{priceLabel}</td>
-                          <td style={{ padding: "0.6rem", color: "#475569" }}>{landArea}</td>
-                          <td style={{ padding: "0.6rem", color: "#475569" }}>{rateLabel}</td>
-                          <td style={{ padding: "0.6rem" }}>
-                            <a
-                              href={sale.source.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: "#1d4ed8" }}
+                        <Fragment key={sale.address + (sale.saleDate ?? index)}>
+                          <tr style={{ borderTop: "1px solid #e2e8f0", backgroundColor: "#ffffff" }}>
+                            <td
+                              rowSpan={2}
+                              style={{
+                                padding: "0.6rem",
+                                color: "#334155",
+                                fontWeight: 600,
+                                verticalAlign: "top",
+                                width: "40px"
+                              }}
                             >
-                              {sale.source.label}
-                            </a>
-                          </td>
-                        </tr>
+                              {index + 1}
+                            </td>
+                            <td colSpan={6} style={{ padding: "0.6rem", color: "#0f172a", fontWeight: 600 }}>
+                              <div>{sale.address}</div>
+                              {sale.comment && (
+                                <div style={{ color: "#64748b", fontSize: "0.8rem", marginTop: "0.2rem", fontWeight: 500 }}>
+                                  {sale.comment}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                          <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                            <td style={{ padding: "0.6rem", color: "#475569" }}>{sale.type}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569" }}>{saleDateLabel}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569" }}>{priceLabel}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569" }}>{landArea}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569" }}>{rateLabel}</td>
+                            <td style={{ padding: "0.6rem" }}>
+                              <a
+                                href={sale.source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: "#1d4ed8" }}
+                              >
+                                {sale.source.label}
+                              </a>
+                            </td>
+                          </tr>
+                          {(sale.landAreaStatus || (sale.landAreaSources && sale.landAreaSources.length > 0)) && (
+                            <tr style={{ backgroundColor: "#ffffff", borderBottom: "1px solid #e2e8f0" }}>
+                              <td colSpan={7} style={{ padding: "0.6rem 0.6rem 0.8rem" }}>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
+                                  {(() => {
+                                    const status = formatLandAreaStatus(sale.landAreaStatus);
+                                    if (!status) return null;
+                                    return (
+                                      <span
+                                        style={{
+                                          alignSelf: "flex-start",
+                                          padding: "0.2rem 0.6rem",
+                                          borderRadius: "999px",
+                                          backgroundColor: status.bg,
+                                          color: status.fg,
+                                          fontSize: "0.75rem",
+                                          fontWeight: 600
+                                        }}
+                                      >
+                                        Land area {status.label}
+                                      </span>
+                                    );
+                                  })()}
+                                  {sale.landAreaSources && sale.landAreaSources.length > 0 && (
+                                    <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#475569", fontSize: "0.8rem" }}>
+                                      {sale.landAreaSources.map((source, sourceIndex) => (
+                                        <li key={source.source + sourceIndex}>{formatLandAreaSource(source)}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -1164,7 +1374,20 @@ function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
             {glossaryEntries.map((entry) => (
               <div key={entry.term}>
                 <dt style={{ fontWeight: 600, color: "#0f172a" }}>{entry.term}</dt>
-                <dd style={{ margin: 0, color: "#475569" }}>{entry.definition}</dd>
+                <dd style={{ margin: 0, color: "#475569" }}>
+                  {entry.url ? (
+                    <a
+                      href={entry.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#1d4ed8" }}
+                    >
+                      {entry.definition}
+                    </a>
+                  ) : (
+                    entry.definition
+                  )}
+                </dd>
               </div>
             ))}
           </dl>
@@ -1176,9 +1399,10 @@ function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
 type MapImageryProps = {
   site: PlanningResult['site'];
   mapsReady: boolean;
+  mapError: string | null;
 };
 
-function MapImagery({ site, mapsReady }: MapImageryProps) {
+function MapImagery({ site, mapsReady, mapError }: MapImageryProps) {
   const fallbackImage = site.mapPreviewUrl;
   const staticMapUrl = buildStaticMapUrl(site.latitude, site.longitude) ?? fallbackImage;
   const streetViewTarget = site.streetView ?? {
@@ -1336,7 +1560,7 @@ function MapImagery({ site, mapsReady }: MapImageryProps) {
                 alt="Satellite map of the selected property"
                 style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
               />
-              {!GOOGLE_MAPS_KEY && (
+              {!GOOGLE_MAPS_KEY || mapError ? (
                 <figcaption
                   style={{
                     padding: "0.75rem 1rem",
@@ -1344,9 +1568,11 @@ function MapImagery({ site, mapsReady }: MapImageryProps) {
                     backgroundColor: "rgba(15, 23, 42, 0.75)"
                   }}
                 >
-                  Add `NEXT_PUBLIC_GOOGLE_MAPS_KEY` to serve live satellite imagery.
+                  {mapError
+                    ? `Google Maps disabled: ${mapError}`
+                    : "Add `NEXT_PUBLIC_GOOGLE_MAPS_KEY` to serve live satellite imagery."}
                 </figcaption>
-              )}
+              ) : null}
               <span
                 style={{
                   position: "absolute",
@@ -1430,9 +1656,10 @@ type ComparableSalesMapProps = {
   site: PlanningResult['site'];
   comparables: ComparableSale[];
   mapsReady: boolean;
+  mapError: string | null;
 };
 
-function ComparableSalesMap({ site, comparables, mapsReady }: ComparableSalesMapProps) {
+function ComparableSalesMap({ site, comparables, mapsReady, mapError }: ComparableSalesMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markerRefs = useRef<google.maps.Marker[]>([]);
@@ -1570,7 +1797,7 @@ function ComparableSalesMap({ site, comparables, mapsReady }: ComparableSalesMap
           alt="Map of nearby sales and development activity"
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
-        {!GOOGLE_MAPS_KEY && (
+        {(!GOOGLE_MAPS_KEY || mapError) && (
           <figcaption
             style={{
               position: "absolute",
@@ -1585,7 +1812,9 @@ function ComparableSalesMap({ site, comparables, mapsReady }: ComparableSalesMap
               lineHeight: 1.4
             }}
           >
-            {'Add `NEXT_PUBLIC_GOOGLE_MAPS_KEY` to display live comparative pins.'}
+            {mapError
+              ? `Google Maps disabled: ${mapError}`
+              : 'Add `NEXT_PUBLIC_GOOGLE_MAPS_KEY` to display live comparative pins.'}
           </figcaption>
         )}
         <figcaption

@@ -15,6 +15,8 @@ const LOT_SEARCH_ENDPOINT =
   'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/Common/LotSearch/MapServer/0/query';
 const LOT_SEARCH_DATASHEET =
   'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/Common/LotSearch/MapServer';
+const CADASTRE_LOT_ENDPOINT =
+  'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Cadastre/MapServer/9/query';
 const LAND_ZONING_ENDPOINT =
   'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/ePlanning/Planning_Portal_Principal_Planning/MapServer/19/query';
 const OSRM_ROUTE_ENDPOINT = 'https://router.project-osrm.org/route/v1/driving';
@@ -26,10 +28,19 @@ type GeocodeResult = {
 };
 
 type ParcelSummary = {
-  frontageMeters: number;
-  depthMeters: number;
+  frontageMeters: number | null;
+  depthMeters: number | null;
+  streetFrontageMeters: number | null;
+  rearBoundaryMeters: number | null;
+  leftBoundaryMeters: number | null;
+  rightBoundaryMeters: number | null;
   areaSquareMeters: number | null;
+  geometryAreaSquareMeters: number | null;
+  planLotAreaSquareMeters: number | null;
+  areaSource: 'geometry' | 'attribute' | 'unknown';
   lotPlan?: string;
+  lotClassSubtype?: number | null;
+  lotType?: string;
   centroidLatitude?: number;
   centroidLongitude?: number;
 };
@@ -50,6 +61,75 @@ type LandZoningAttributes = {
   EPI_NAME?: string;
   COMMENCED_DATE?: number;
 };
+
+const LOT_CLASS_SUBTYPE_LABELS: Record<number, string> = {
+  1: 'Standard lot',
+  2: 'Part lot',
+  3: 'Strata lot',
+  4: 'Stratum lot'
+};
+
+type LandAreaCandidate = {
+  source: string;
+  value: number | null;
+  method?: 'manual' | 'geometry' | 'attribute' | 'derived';
+  notes?: string;
+};
+
+type LandAreaResolutionStatus = 'verified' | 'estimated' | 'conflict' | 'missing';
+
+type LandAreaResolution = {
+  value: number | null;
+  status: LandAreaResolutionStatus;
+  candidates: LandAreaCandidate[];
+};
+
+type ComparableSale = {
+  address: string;
+  type: string;
+  saleDate: string;
+  salePrice: number;
+  landAreaSquareMeters?: number | null;
+  year: number;
+  comment: string;
+  description: string;
+  latitude?: number;
+  longitude?: number;
+  source: {
+    label: string;
+    url: string;
+  };
+  landAreaStatus?: LandAreaResolutionStatus;
+  landAreaSources?: LandAreaCandidate[];
+};
+
+const LAND_AREA_MATCH_TOLERANCE = 0.05;
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function normalisePlanLotArea(value: unknown, units?: unknown): number | null {
+  if (!isFiniteNumber(value)) {
+    return null;
+  }
+  if (typeof units === 'string' && units.toLowerCase() === 'ha') {
+    return value * 10000;
+  }
+  return value;
+}
+
+function relativeDifference(a: number, b: number) {
+  const denominator = Math.max(Math.abs(a), Math.abs(b), 1);
+  return Math.abs(a - b) / denominator;
+}
+
+function mean(values: number[]) {
+  if (values.length === 0) {
+    return null;
+  }
+  return values.reduce((total, current) => total + current, 0) / values.length;
+}
 
 function buildFallbackStaticMap(latitude?: number, longitude?: number) {
   if (
@@ -177,7 +257,10 @@ function computePolygonArea(points: Array<{ x: number; y: number }>) {
   return Math.abs(area / 2);
 }
 
-function formatMeters(value: number) {
+function formatMeters(value: number | null | undefined, fallback = 'N/A') {
+  if (!isFiniteNumber(value)) {
+    return fallback;
+  }
   return `${value.toFixed(1)} m`;
 }
 
@@ -354,6 +437,297 @@ function distanceToRingsMeters(
   return minDistance;
 }
 
+type BoundaryMetrics = {
+  depthMeters: number | null;
+  widthMeters: number | null;
+  streetFrontageMeters: number | null;
+  rearBoundaryMeters: number | null;
+  leftBoundaryMeters: number | null;
+  rightBoundaryMeters: number | null;
+};
+
+function sanitiseLength(value: number | null | undefined) {
+  if (!isFiniteNumber(value)) {
+    return null;
+  }
+  const absolute = Math.abs(value);
+  if (absolute < 0.01) {
+    return null;
+  }
+  return absolute;
+}
+
+function computeBoundaryMetrics(
+  mercatorPoints: Array<{ x: number; y: number }> | undefined,
+  geocode?: { x: number; y: number }
+): BoundaryMetrics {
+  if (!mercatorPoints || mercatorPoints.length < 3) {
+    return {
+      depthMeters: null,
+      widthMeters: null,
+      streetFrontageMeters: null,
+      rearBoundaryMeters: null,
+      leftBoundaryMeters: null,
+      rightBoundaryMeters: null
+    };
+  }
+
+  const points = [...mercatorPoints];
+  if (points.length > 1) {
+    const first = points[0];
+    const last = points[points.length - 1];
+    if (Math.abs(first.x - last.x) < 0.01 && Math.abs(first.y - last.y) < 0.01) {
+      points.pop();
+    }
+  }
+
+  if (points.length < 3) {
+    return {
+      depthMeters: null,
+      widthMeters: null,
+      streetFrontageMeters: null,
+      rearBoundaryMeters: null,
+      leftBoundaryMeters: null,
+      rightBoundaryMeters: null
+    };
+  }
+
+  let meanX = 0;
+  let meanY = 0;
+  for (const point of points) {
+    meanX += point.x;
+    meanY += point.y;
+  }
+  meanX /= points.length;
+  meanY /= points.length;
+
+  let sumXX = 0;
+  let sumYY = 0;
+  let sumXY = 0;
+  for (const point of points) {
+    const dx = point.x - meanX;
+    const dy = point.y - meanY;
+    sumXX += dx * dx;
+    sumYY += dy * dy;
+    sumXY += dx * dy;
+  }
+  const divisor = points.length === 0 ? 1 : points.length;
+  const covXX = sumXX / divisor;
+  const covYY = sumYY / divisor;
+  const covXY = sumXY / divisor;
+
+  const diff = covXX - covYY;
+  const discriminant = Math.sqrt(Math.max(0, diff * diff + 4 * covXY * covXY));
+  const lambda1 = (covXX + covYY + discriminant) / 2;
+  const lambda2 = (covXX + covYY - discriminant) / 2;
+
+  const epsilon = 1e-9;
+  let axis1: [number, number];
+  if (Math.abs(covXY) > epsilon) {
+    axis1 = [lambda1 - covYY, covXY];
+  } else if (covXX >= covYY) {
+    axis1 = [1, 0];
+  } else {
+    axis1 = [0, 1];
+  }
+  const axis1Length = Math.hypot(axis1[0], axis1[1]);
+  if (axis1Length > 0) {
+    axis1 = [axis1[0] / axis1Length, axis1[1] / axis1Length];
+  } else {
+    axis1 = [1, 0];
+  }
+
+  let axis2: [number, number];
+  if (discriminant < epsilon && Math.abs(lambda1 - lambda2) < epsilon) {
+    axis2 = [0, 1];
+  } else {
+    axis2 = [-axis1[1], axis1[0]];
+  }
+
+  const axisPoints = points.map((point) => {
+    const dx = point.x - meanX;
+    const dy = point.y - meanY;
+    const depth = axis1[0] * dx + axis1[1] * dy;
+    const width = axis2[0] * dx + axis2[1] * dy;
+    return { depth, width };
+  });
+
+  const depthValues = axisPoints.map((point) => point.depth);
+  const widthValues = axisPoints.map((point) => point.width);
+  const minDepth = Math.min(...depthValues);
+  const maxDepth = Math.max(...depthValues);
+  const minWidth = Math.min(...widthValues);
+  const maxWidth = Math.max(...widthValues);
+
+  const depthRange = sanitiseLength(maxDepth - minDepth);
+  const widthRange = sanitiseLength(maxWidth - minWidth);
+
+  const depthTolerance = Math.max(0.5, Math.abs((maxDepth - minDepth) * 0.05));
+  const widthTolerance = Math.max(0.5, Math.abs((maxWidth - minWidth) * 0.05));
+
+  let geocodeDepth: number | null = null;
+  if (geocode && isFiniteNumber(geocode.x) && isFiniteNumber(geocode.y)) {
+    const dx = geocode.x - meanX;
+    const dy = geocode.y - meanY;
+    geocodeDepth = axis1[0] * dx + axis1[1] * dy;
+  }
+
+  let frontDepth = minDepth;
+  let rearDepth = maxDepth;
+  if (geocodeDepth !== null) {
+    const distanceToMin = Math.abs(geocodeDepth - minDepth);
+    const distanceToMax = Math.abs(maxDepth - geocodeDepth);
+    if (distanceToMax < distanceToMin) {
+      frontDepth = maxDepth;
+      rearDepth = minDepth;
+    }
+  }
+
+  const pointsCount = axisPoints.length;
+
+  const collectWidthsAtDepth = (targetDepth: number) => {
+    const values: number[] = [];
+    for (let index = 0; index < pointsCount; index += 1) {
+      const current = axisPoints[index];
+      const next = axisPoints[(index + 1) % pointsCount];
+
+      if (Math.abs(current.depth - targetDepth) <= depthTolerance) {
+        values.push(current.width);
+      }
+      if (Math.abs(next.depth - targetDepth) <= depthTolerance) {
+        values.push(next.width);
+      }
+
+      const depthDelta = next.depth - current.depth;
+      if (depthDelta === 0) {
+        continue;
+      }
+      const t = (targetDepth - current.depth) / depthDelta;
+      if (t > 0 && t < 1) {
+        const widthAt = current.width + t * (next.width - current.width);
+        values.push(widthAt);
+      }
+    }
+    return values.filter((value) => Number.isFinite(value)) as number[];
+  };
+
+  const collectDepthsAtWidth = (targetWidth: number) => {
+    const values: number[] = [];
+    for (let index = 0; index < pointsCount; index += 1) {
+      const current = axisPoints[index];
+      const next = axisPoints[(index + 1) % pointsCount];
+
+      if (Math.abs(current.width - targetWidth) <= widthTolerance) {
+        values.push(current.depth);
+      }
+      if (Math.abs(next.width - targetWidth) <= widthTolerance) {
+        values.push(next.depth);
+      }
+
+      const widthDelta = next.width - current.width;
+      if (widthDelta === 0) {
+        continue;
+      }
+      const t = (targetWidth - current.width) / widthDelta;
+      if (t > 0 && t < 1) {
+        const depthAt = current.depth + t * (next.depth - current.depth);
+        values.push(depthAt);
+      }
+    }
+    return values.filter((value) => Number.isFinite(value)) as number[];
+  };
+
+  const computeRange = (values: number[]) => {
+    if (!values || values.length < 2) {
+      return null;
+    }
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    return sanitiseLength(maxValue - minValue);
+  };
+
+  let streetFrontageMeters = computeRange(collectWidthsAtDepth(frontDepth));
+  if (streetFrontageMeters === null) {
+    streetFrontageMeters = widthRange;
+  }
+
+  let rearBoundaryMeters = computeRange(collectWidthsAtDepth(rearDepth));
+  if (rearBoundaryMeters === null) {
+    rearBoundaryMeters = widthRange;
+  }
+
+  let leftBoundaryMeters = computeRange(collectDepthsAtWidth(minWidth));
+  if (leftBoundaryMeters === null) {
+    leftBoundaryMeters = depthRange;
+  }
+
+  let rightBoundaryMeters = computeRange(collectDepthsAtWidth(maxWidth));
+  if (rightBoundaryMeters === null) {
+    rightBoundaryMeters = depthRange;
+  }
+
+  return {
+    depthMeters: depthRange,
+    widthMeters: widthRange,
+    streetFrontageMeters,
+    rearBoundaryMeters,
+    leftBoundaryMeters,
+    rightBoundaryMeters
+  };
+}
+
+function inferLotType(
+  classSubtype: number | null | undefined,
+  metrics: {
+    streetFrontageMeters?: number | null;
+    rearBoundaryMeters?: number | null;
+    leftBoundaryMeters?: number | null;
+    rightBoundaryMeters?: number | null;
+  }
+): string | undefined {
+  const subtypeLabel =
+    classSubtype !== null && classSubtype !== undefined
+      ? LOT_CLASS_SUBTYPE_LABELS[classSubtype]
+      : undefined;
+
+  if (subtypeLabel && subtypeLabel !== 'Standard lot') {
+    return subtypeLabel;
+  }
+
+  const frontage = metrics.streetFrontageMeters;
+  const rear = metrics.rearBoundaryMeters;
+  const left = metrics.leftBoundaryMeters;
+  const right = metrics.rightBoundaryMeters;
+
+  if (isFiniteNumber(frontage) && isFiniteNumber(rear)) {
+    if (frontage < rear * 0.5 && frontage < 6) {
+      return 'Battle-axe lot';
+    }
+
+    const taperRatio = frontage / rear;
+    if (taperRatio > 1.4) {
+      return 'Tapered lot (front wider)';
+    }
+    if (taperRatio < 0.7) {
+      return 'Tapered lot (rear wider)';
+    }
+  }
+
+  if (isFiniteNumber(left) && isFiniteNumber(right)) {
+    const minSide = Math.min(left, right);
+    const maxSide = Math.max(left, right);
+    if (minSide > 0 && maxSide / minSide > 1.5) {
+      return 'Irregular lot';
+    }
+  }
+
+  if (subtypeLabel) {
+    return subtypeLabel;
+  }
+
+  return undefined;
+}
+
 async function querySeppHousingLayer<T>(
   layerId: number,
   params: Record<string, string>
@@ -379,6 +753,303 @@ async function querySeppHousingLayer<T>(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function fetchCadastreLotArea(
+  latitude?: number,
+  longitude?: number
+): Promise<{
+  lotPlan?: string;
+  geometryAreaSquareMeters: number | null;
+  planLotAreaSquareMeters: number | null;
+} | null> {
+  if (
+    latitude === undefined ||
+    longitude === undefined ||
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
+    return null;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const params = new URLSearchParams({
+      f: 'json',
+      geometryType: 'esriGeometryPoint',
+      inSR: '4326',
+      spatialRel: 'esriSpatialRelIntersects',
+      returnGeometry: 'true',
+      outFields: 'lotnumber,planlabel,planlotarea,planlotareaunits',
+      maxRecordCountFactor: '2'
+    });
+    params.set('geometry', JSON.stringify({ x: longitude, y: latitude }));
+
+    const response = await fetch(`${CADASTRE_LOT_ENDPOINT}?${params.toString()}`, {
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = (await response.json()) as {
+      features?: Array<{
+        attributes?: {
+          lotnumber?: string;
+          planlabel?: string;
+          planlotarea?: number;
+          planlotareaunits?: string;
+        };
+        geometry?: { rings?: ArcGisRing[] };
+      }>;
+    };
+
+    const feature = data.features?.[0];
+    if (!feature) {
+      return null;
+    }
+
+    const lotNumber =
+      feature.attributes?.lotnumber ?? (feature.attributes as Record<string, unknown>)?.LOTNUMBER;
+    const planLabel =
+      feature.attributes?.planlabel ?? (feature.attributes as Record<string, unknown>)?.PLANLABEL;
+    const lotPlan = lotNumber && planLabel ? `Lot ${lotNumber} ${planLabel}` : planLabel ?? undefined;
+
+    const planLotArea = normalisePlanLotArea(
+      feature.attributes?.planlotarea ?? (feature.attributes as Record<string, unknown>)?.PLANLOTAREA,
+      feature.attributes?.planlotareaunits ??
+        (feature.attributes as Record<string, unknown>)?.PLANLOTAREAUNITS
+    );
+
+    const rings = feature.geometry?.rings;
+    let geometryAreaSquareMeters: number | null = null;
+    if (Array.isArray(rings) && rings.length > 0) {
+      const firstRing = rings[0];
+      const geometryPoints = firstRing.map(([x, y]) => ({ x, y }));
+      const candidateArea = computePolygonArea(geometryPoints);
+      geometryAreaSquareMeters = isFiniteNumber(candidateArea) ? candidateArea : null;
+    }
+
+    return {
+      lotPlan,
+      geometryAreaSquareMeters,
+      planLotAreaSquareMeters: planLotArea
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function resolveLandArea(candidates: LandAreaCandidate[]): LandAreaResolution {
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    return { value: null, status: 'missing', candidates: [] };
+  }
+
+  const uniqueCandidates = candidates;
+
+  const finiteCandidates = uniqueCandidates.filter(
+    (candidate) => candidate.value !== null && isFiniteNumber(candidate.value)
+  ) as Array<LandAreaCandidate & { value: number }>;
+
+  if (finiteCandidates.length === 0) {
+    return { value: null, status: 'missing', candidates: uniqueCandidates };
+  }
+
+  const methodPriority: Record<NonNullable<LandAreaCandidate['method']>, number> = {
+    manual: 0,
+    geometry: 1,
+    attribute: 2,
+    derived: 3
+  };
+  const priorityForCandidate = (candidate: LandAreaCandidate) => {
+    if (candidate.method && methodPriority[candidate.method] !== undefined) {
+      return methodPriority[candidate.method];
+    }
+    return 4;
+  };
+
+  const sortedByPriority = [...finiteCandidates].sort(
+    (a, b) => priorityForCandidate(a) - priorityForCandidate(b)
+  );
+
+  const manualCandidate = sortedByPriority.find((candidate) => candidate.method === 'manual');
+  if (manualCandidate) {
+    const supporting = sortedByPriority.filter(
+      (candidate) =>
+        candidate !== manualCandidate &&
+        relativeDifference(candidate.value, manualCandidate.value) <= LAND_AREA_MATCH_TOLERANCE
+    );
+    if (supporting.length > 0) {
+      return {
+        value: manualCandidate.value,
+        status: 'verified',
+        candidates: uniqueCandidates
+      };
+    }
+
+    const conflicting = sortedByPriority.filter(
+      (candidate) =>
+        candidate !== manualCandidate &&
+        relativeDifference(candidate.value, manualCandidate.value) > LAND_AREA_MATCH_TOLERANCE
+    );
+
+    return {
+      value: manualCandidate.value,
+      status: conflicting.length > 0 ? 'conflict' : 'estimated',
+      candidates: uniqueCandidates
+    };
+  }
+
+  const groups = sortedByPriority.map((candidate) => {
+    const matched = sortedByPriority.filter((other) => {
+      if (candidate === other) {
+        return true;
+      }
+      return relativeDifference(candidate.value, other.value) <= LAND_AREA_MATCH_TOLERANCE;
+    });
+    return matched;
+  });
+
+  const bestGroup = groups.reduce<Array<LandAreaCandidate & { value: number }> | null>(
+    (best, current) => {
+      if (!current || current.length === 0) {
+        return best;
+      }
+
+      if (!best) {
+        return current;
+      }
+
+      if (current.length > best.length) {
+        return current;
+      }
+
+      if (current.length === best.length) {
+        const currentPriority = Math.min(...current.map(priorityForCandidate));
+        const bestPriority = Math.min(...best.map(priorityForCandidate));
+        return currentPriority < bestPriority ? current : best;
+      }
+
+      return best;
+    },
+    null
+  );
+
+  if (bestGroup && bestGroup.length >= 2) {
+    const values = bestGroup.map((candidate) => candidate.value);
+    const averaged = mean(values);
+    if (averaged !== null) {
+      const conflict =
+        manualCandidate &&
+        !bestGroup.includes(manualCandidate) &&
+        manualCandidate.value !== null &&
+        isFiniteNumber(manualCandidate.value) &&
+        relativeDifference(manualCandidate.value, averaged) > LAND_AREA_MATCH_TOLERANCE;
+
+      return {
+        value: averaged,
+        status: conflict ? 'conflict' : 'verified',
+        candidates: uniqueCandidates
+      };
+    }
+  }
+
+  const chosen = sortedByPriority[0];
+  if (!chosen) {
+    return { value: null, status: 'missing', candidates: uniqueCandidates };
+  }
+
+  const hasConflict = sortedByPriority.some(
+    (candidate) =>
+      candidate !== chosen &&
+      relativeDifference(candidate.value, chosen.value) > LAND_AREA_MATCH_TOLERANCE
+  );
+
+  let status: LandAreaResolutionStatus = 'estimated';
+  if (sortedByPriority.length > 1) {
+    status = hasConflict ? 'conflict' : 'verified';
+  }
+
+  return {
+    value: chosen.value,
+    status,
+    candidates: uniqueCandidates
+  };
+}
+
+async function enrichComparableSalesLandArea(
+  sales: ComparableSale[]
+): Promise<ComparableSale[]> {
+  return Promise.all(
+    sales.map(async (sale) => {
+      const candidates: LandAreaCandidate[] = [];
+
+      if (isFiniteNumber(sale.landAreaSquareMeters)) {
+        candidates.push({
+          source: 'Seed dataset',
+          value: sale.landAreaSquareMeters,
+          method: 'manual',
+          notes: 'Pre-populated comparable record'
+        });
+      }
+
+      const hasCoordinates =
+        sale.latitude !== undefined &&
+        sale.longitude !== undefined &&
+        isFiniteNumber(sale.latitude) &&
+        isFiniteNumber(sale.longitude);
+
+      if (hasCoordinates) {
+        const parcelSummary = await fetchParcelSummary(sale.latitude, sale.longitude);
+        if (parcelSummary) {
+          candidates.push({
+            source: 'NSW LotSearch geometry',
+            value: parcelSummary.geometryAreaSquareMeters,
+            method: 'geometry',
+            notes: parcelSummary.lotPlan
+          });
+          candidates.push({
+            source: 'NSW LotSearch PLANLOTAREA',
+            value: parcelSummary.planLotAreaSquareMeters,
+            method: 'attribute',
+            notes: parcelSummary.lotPlan
+          });
+        }
+
+        const cadastreSummary = await fetchCadastreLotArea(sale.latitude, sale.longitude);
+        if (cadastreSummary) {
+          candidates.push({
+            source: 'NSW Cadastre geometry',
+            value: cadastreSummary.geometryAreaSquareMeters,
+            method: 'geometry',
+            notes: cadastreSummary.lotPlan
+          });
+          candidates.push({
+            source: 'NSW Cadastre planlotarea',
+            value: cadastreSummary.planLotAreaSquareMeters,
+            method: 'attribute',
+            notes: cadastreSummary.lotPlan
+          });
+        }
+      }
+
+      const resolution = resolveLandArea(candidates);
+      const resolvedValue =
+        resolution.value ?? (isFiniteNumber(sale.landAreaSquareMeters) ? sale.landAreaSquareMeters : null);
+
+      return {
+        ...sale,
+        landAreaSquareMeters: resolvedValue,
+        landAreaStatus: resolution.status,
+        landAreaSources: resolution.candidates
+      };
+    })
+  );
 }
 
 async function fetchTodInsights(
@@ -676,7 +1347,7 @@ async function fetchParcelSummary(
       inSR: '4326',
       spatialRel: 'esriSpatialRelIntersects',
       returnGeometry: 'true',
-      outFields: 'LOTNUMBER,PLANLABEL,LOT_DP,PLANLOTAREA'
+      outFields: 'LOTNUMBER,PLANLABEL,LOT_DP,PLANLOTAREA,CLASSSUBTYPE'
     });
     params.set('geometry', JSON.stringify({ x: longitude, y: latitude }));
 
@@ -695,6 +1366,7 @@ async function fetchParcelSummary(
           PLANLABEL?: string;
           LOT_DP?: string;
           PLANLOTAREA?: number;
+          CLASSSUBTYPE?: number;
         };
         geometry?: { rings?: ArcGisRing[] };
       }>;
@@ -707,15 +1379,32 @@ async function fetchParcelSummary(
 
     const lotNumber = feature.attributes?.LOTNUMBER;
     const planLabel = feature.attributes?.PLANLABEL ?? feature.attributes?.LOT_DP;
+    const planLotArea = normalisePlanLotArea(feature.attributes?.PLANLOTAREA);
     const lotPlan = lotNumber && planLabel ? `Lot ${lotNumber} ${planLabel}` : planLabel ?? undefined;
+    const classSubtypeRaw = feature.attributes?.CLASSSUBTYPE;
+    const lotClassSubtype =
+      typeof classSubtypeRaw === 'number' && Number.isFinite(classSubtypeRaw)
+        ? classSubtypeRaw
+        : typeof classSubtypeRaw === 'string'
+          ? Number.parseInt(classSubtypeRaw, 10)
+          : null;
 
     const rings = feature.geometry?.rings;
     if (!rings || rings.length === 0) {
       return {
-        frontageMeters: 0,
-        depthMeters: 0,
-        areaSquareMeters: feature.attributes?.PLANLOTAREA ?? null,
+        frontageMeters: null,
+        depthMeters: null,
+        streetFrontageMeters: null,
+        rearBoundaryMeters: null,
+        leftBoundaryMeters: null,
+        rightBoundaryMeters: null,
+        areaSquareMeters: planLotArea,
+        geometryAreaSquareMeters: null,
+        planLotAreaSquareMeters: planLotArea,
+        areaSource: planLotArea !== null ? 'attribute' : 'unknown',
         lotPlan,
+        lotClassSubtype,
+        lotType: inferLotType(lotClassSubtype, {}),
         centroidLatitude: undefined,
         centroidLongitude: undefined
       };
@@ -726,22 +1415,29 @@ async function fetchParcelSummary(
     const areaSquareMeters = computePolygonArea(mercatorPoints);
     const centroid = polygonCentroid(rings);
 
-    const [minX, maxX] = [
-      Math.min(...firstRing.map(([lon]) => lon)),
-      Math.max(...firstRing.map(([lon]) => lon))
-    ];
-    const [minY, maxY] = [
-      Math.min(...firstRing.map(([, lat]) => lat)),
-      Math.max(...firstRing.map(([, lat]) => lat))
-    ];
-    const frontageMeters = haversineDistanceMeters(minY, minX, minY, maxX);
-    const depthMeters = haversineDistanceMeters(minY, minX, maxY, minX);
+    const geocodePoint = toWebMercator(longitude, latitude);
+    const boundaryMetrics = computeBoundaryMetrics(mercatorPoints, geocodePoint);
+
+    const geometryAreaSquareMeters = isFiniteNumber(areaSquareMeters) ? areaSquareMeters : null;
+    const areaSquareMetersBest = geometryAreaSquareMeters ?? planLotArea ?? null;
+    const areaSource =
+      geometryAreaSquareMeters !== null ? 'geometry' : planLotArea !== null ? 'attribute' : 'unknown';
+    const lotType = inferLotType(lotClassSubtype, boundaryMetrics);
 
     return {
-      frontageMeters,
-      depthMeters,
-      areaSquareMeters,
+      frontageMeters: boundaryMetrics.streetFrontageMeters,
+      depthMeters: boundaryMetrics.depthMeters,
+      streetFrontageMeters: boundaryMetrics.streetFrontageMeters,
+      rearBoundaryMeters: boundaryMetrics.rearBoundaryMeters,
+      leftBoundaryMeters: boundaryMetrics.leftBoundaryMeters,
+      rightBoundaryMeters: boundaryMetrics.rightBoundaryMeters,
+      areaSquareMeters: areaSquareMetersBest,
+      geometryAreaSquareMeters,
+      planLotAreaSquareMeters: planLotArea,
+      areaSource,
       lotPlan,
+      lotClassSubtype,
+      lotType,
       centroidLatitude: centroid?.latitude,
       centroidLongitude: centroid?.longitude
     };
@@ -880,22 +1576,53 @@ export async function GET(request: Request) {
         value: '600 square metres',
         linkLabel: `${legacyPlan.lepName} - Lot Size Map`,
         linkUrl: lepUrl(legacyPlan.lotSizeSchedule)
+      },
+      {
+        id: 'setbacks',
+        label: 'Indicative Residential Setbacks',
+        value: 'Front 6 m / Side 0.9 m / Rear 3 m',
+        linkLabel: 'Codes SEPP Part 3A - Dual Occupancies',
+        linkUrl: CODES_SEPP_PART3A_URL
       }
     ];
 
     if (parcelSummary) {
+      const geometryFallback = 'N/A (insufficient parcel geometry)';
+      const frontageValue =
+        parcelSummary.streetFrontageMeters ?? parcelSummary.frontageMeters ?? null;
       metrics.push(
         {
-          id: 'frontage',
-          label: 'Approx. Parcel Frontage',
-          value: formatMeters(parcelSummary.frontageMeters),
+          id: 'street-frontage',
+          label: 'Approx. Street Frontage',
+          value: formatMeters(frontageValue, geometryFallback),
           linkLabel: 'NSW LotSearch (Common/LotSearch)',
           linkUrl: LOT_SEARCH_DATASHEET
         },
         {
-          id: 'depth',
+          id: 'parcel-depth',
           label: 'Approx. Parcel Depth',
-          value: formatMeters(parcelSummary.depthMeters),
+          value: formatMeters(parcelSummary.depthMeters, geometryFallback),
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        },
+        {
+          id: 'rear-width',
+          label: 'Approx. Rear Boundary Width',
+          value: formatMeters(parcelSummary.rearBoundaryMeters, geometryFallback),
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        },
+        {
+          id: 'left-boundary',
+          label: 'Approx. Left Boundary Length',
+          value: formatMeters(parcelSummary.leftBoundaryMeters, geometryFallback),
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        },
+        {
+          id: 'right-boundary',
+          label: 'Approx. Right Boundary Length',
+          value: formatMeters(parcelSummary.rightBoundaryMeters, geometryFallback),
           linkLabel: 'NSW LotSearch (Common/LotSearch)',
           linkUrl: LOT_SEARCH_DATASHEET
         }
@@ -906,6 +1633,15 @@ export async function GET(request: Request) {
           id: 'area',
           label: 'Parcel Area',
           value: areaLabel,
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        });
+      }
+      if (parcelSummary.lotType) {
+        metrics.push({
+          id: 'lot-type',
+          label: 'Lot Type',
+          value: parcelSummary.lotType,
           linkLabel: 'NSW LotSearch (Common/LotSearch)',
           linkUrl: LOT_SEARCH_DATASHEET
         });
@@ -998,21 +1734,21 @@ export async function GET(request: Request) {
       ? `Housing SEPP Low and Mid-Rise ${todBand.toLowerCase()} band unlocks uplift when Development Applications demonstrate design excellence and frontage >=21 m.`
       : 'Outside Housing SEPP Low and Mid-Rise mapping. Uplift relies on town centre programs or planning proposals.';
 
+    const frontageMetersValue =
+      parcelSummary?.streetFrontageMeters ?? parcelSummary?.frontageMeters ?? null;
     const frontageApprox =
-      parcelSummary && Number.isFinite(parcelSummary.frontageMeters) && parcelSummary.frontageMeters > 0
-        ? `${formatMeters(parcelSummary.frontageMeters)} frontage (approx)`
+      isFiniteNumber(frontageMetersValue) && frontageMetersValue > 0
+        ? `${formatMeters(frontageMetersValue)} frontage (approx)`
         : 'approx. 15 m frontage (Codes SEPP Part 3A minimum)';
+    const depthMetersValue = parcelSummary?.depthMeters ?? null;
     const depthApprox =
-      parcelSummary && Number.isFinite(parcelSummary.depthMeters) && parcelSummary.depthMeters > 0
-        ? `${formatMeters(parcelSummary.depthMeters)} depth (approx)`
+      isFiniteNumber(depthMetersValue) && depthMetersValue > 0
+        ? `${formatMeters(depthMetersValue)} depth (approx)`
         : 'Depth supports dual occupancy envelope';
     const areaApprox =
       maybeFormatArea(parcelSummary?.areaSquareMeters) ?? '>=600 m^2 (LEP minimum lot size)';
     const frontage21mSatisfied =
-      parcelSummary !== null &&
-      parcelSummary?.frontageMeters !== undefined &&
-      Number.isFinite(parcelSummary.frontageMeters) &&
-      parcelSummary.frontageMeters >= 21;
+      isFiniteNumber(frontageMetersValue) && frontageMetersValue >= 21;
 
     const lmrContextSummary =
       todBand !== 'N/A'
@@ -1569,6 +2305,96 @@ export async function GET(request: Request) {
       }
     ];
 
+    const comparableSaleSeeds: ComparableSale[] = [
+      {
+        address: '14 Ocean View Drive, Dee Why NSW 2099',
+        type: 'Dual Occupancy',
+        saleDate: '2024-03-18',
+        salePrice: 2450000,
+        landAreaSquareMeters: 446,
+        year: 2024,
+        comment: 'Recently completed duplex with coastal finishes and compliant setbacks.',
+        description: 'New dual occupancy with double garage and 4-bedroom layout over two levels.',
+        latitude: -33.7529,
+        longitude: 151.3008,
+        source: {
+          label: 'NSW Planning Portal - Sales Evidence',
+          url: 'https://www.planning.nsw.gov.au/'
+        }
+      },
+      {
+        address: '21 Foreshore Avenue, Collaroy NSW 2097',
+        type: 'Semi-Detached',
+        saleDate: '2023-11-02',
+        salePrice: 2320000,
+        landAreaSquareMeters: 405,
+        year: 2023,
+        comment: 'Attached dwellings on similar lot depth with landscaped frontage and private courtyards.',
+        description: 'Two semi-detached dwellings each with double garage and coastal design palette.',
+        latitude: -33.7312,
+        longitude: 151.3015,
+        source: {
+          label: 'NSW Planning Portal - Sales Evidence',
+          url: 'https://www.planning.nsw.gov.au/'
+        }
+      },
+      {
+        address: '5 Victor Road, Dee Why NSW 2099',
+        type: 'Dual Occupancy',
+        saleDate: '2023-08-14',
+        salePrice: 2280000,
+        landAreaSquareMeters: 462,
+        year: 2023,
+        comment: 'Merit-approved duplex demonstrating council appetite for high quality attached dwellings.',
+        description:
+          'Dual occupancy with articulated facade, ground floor garages and deep rear landscape.',
+        latitude: -33.7574,
+        longitude: 151.289,
+        source: {
+          label: 'Northern Beaches Council Development Application (DA) Tracker',
+          url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
+        }
+      },
+      {
+        address: '53A Seaview Street, Balgowlah NSW 2093',
+        type: 'Duplex Pair',
+        saleDate: '2024-04-05',
+        salePrice: 5900000,
+        landAreaSquareMeters: 339,
+        year: 2024,
+        comment:
+          'High-end duplex overlooking North Harbour at 53A Seaview Street; price disclosed post-settlement at $5.9m.',
+        description:
+          'Premium three-level attached dwellings with lift, harbour terrace, and luxury fitout.',
+        latitude: -33.7906,
+        longitude: 151.2595,
+        source: {
+          label: 'NSW Titles Office Settlement Notice',
+          url: 'https://www.nswlrs.com.au/'
+        }
+      },
+      {
+        address: '25A Nield Avenue, Balgowlah NSW 2093',
+        type: 'Dual Occupancy',
+        saleDate: '2023-10-21',
+        salePrice: 4750000,
+        landAreaSquareMeters: 319,
+        year: 2023,
+        comment:
+          'Architect-designed duplex on single 319 m^2 Torrens title lot roughly 2 km south of the subject catchment.',
+        description:
+          'Dual occupancy featuring 4 bedrooms, plunge pool, and double garage on 319 m^2 allotment.',
+        latitude: -33.7927,
+        longitude: 151.2551,
+        source: {
+          label: 'Northern Beaches Prestige Sales',
+          url: 'https://www.planning.nsw.gov.au/'
+        }
+      }
+    ];
+
+    const comparableSales = await enrichComparableSalesLandArea(comparableSaleSeeds);
+
     const generatedAt = new Date().toISOString();
 
     const sample = {
@@ -1645,91 +2471,7 @@ export async function GET(request: Request) {
           ]
         }
       ],
-      comparableSales: [
-        {
-          address: '14 Ocean View Drive, Dee Why NSW 2099',
-          type: 'Dual Occupancy',
-          saleDate: '2024-03-18',
-          salePrice: 2450000,
-          landAreaSquareMeters: 446,
-          year: 2024,
-          comment: 'Recently completed duplex with coastal finishes and compliant setbacks.',
-          description: 'New dual occupancy with double garage and 4-bedroom layout over two levels.',
-          latitude: -33.7529,
-          longitude: 151.3008,
-          source: {
-            label: 'NSW Planning Portal - Sales Evidence',
-            url: 'https://www.planning.nsw.gov.au/'
-          }
-        },
-        {
-          address: '21 Foreshore Avenue, Collaroy NSW 2097',
-          type: 'Semi-Detached',
-          saleDate: '2023-11-02',
-          salePrice: 2320000,
-          landAreaSquareMeters: 405,
-          year: 2023,
-          comment: 'Attached dwellings on similar lot depth with landscaped frontage and private courtyards.',
-          description: 'Two semi-detached dwellings each with double garage and coastal design palette.',
-          latitude: -33.7312,
-          longitude: 151.3015,
-          source: {
-            label: 'NSW Planning Portal - Sales Evidence',
-            url: 'https://www.planning.nsw.gov.au/'
-          }
-        },
-        {
-          address: '5 Victor Road, Dee Why NSW 2099',
-          type: 'Dual Occupancy',
-          saleDate: '2023-08-14',
-          salePrice: 2280000,
-          landAreaSquareMeters: 462,
-          year: 2023,
-          comment: 'Merit-approved duplex demonstrating council appetite for high quality attached dwellings.',
-          description: 'Dual occupancy with articulated facade, ground floor garages and deep rear landscape.',
-          latitude: -33.7574,
-          longitude: 151.289,
-          source: {
-            label: 'Northern Beaches Council Development Application (DA) Tracker',
-            url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
-          }
-        },
-        {
-          address: '59A Seaview Street, Balgowlah NSW 2093',
-          type: 'Duplex Pair',
-          saleDate: '2024-04-05',
-          salePrice: 5900000,
-          landAreaSquareMeters: 512,
-          year: 2024,
-          comment:
-            'High-end duplex overlooking North Harbour; price disclosed post-settlement at $5.9m.',
-          description:
-            'Premium three-level attached dwellings with lift, harbour terrace, and luxury fitout.',
-          latitude: -33.7906,
-          longitude: 151.2595,
-          source: {
-            label: 'NSW Titles Office Settlement Notice',
-            url: 'https://www.nswlrs.com.au/'
-          }
-        },
-        {
-          address: '25A Nield Avenue, Balgowlah NSW 2093',
-          type: 'Dual Occupancy',
-          saleDate: '2023-10-21',
-          salePrice: 4750000,
-          landAreaSquareMeters: 480,
-          year: 2023,
-          comment: 'Architect-designed duplex with wide frontage 2km south of the subject catchment.',
-          description:
-            'Dual occupancy featuring 4 bedrooms, plunge pool, and double garage on 480 m^2 allotment.',
-          latitude: -33.7927,
-          longitude: 151.2551,
-          source: {
-            label: 'Northern Beaches Prestige Sales',
-            url: 'https://www.planning.nsw.gov.au/'
-          }
-        }
-      ],
+      comparableSales,
       developmentActivity: [
         {
           applicationNumber: 'DA2023/1122',
