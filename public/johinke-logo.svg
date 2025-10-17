@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80" viewBox="0 0 320 80" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">Johinke Development logo</title>
+  <desc id="logoDesc">Stylised JD monogram with Johinke Development wordmark</desc>
+  <defs>
+    <linearGradient id="jdGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect fill="#f8fafc" width="320" height="80" rx="12"/>
+  <g transform="translate(24 16)">
+    <path d="M0 0h24c13.255 0 24 10.745 24 24s-10.745 24-24 24H8V34h16c5.523 0 10-4.477 10-10s-4.477-10-10-10H0V0z" fill="url(#jdGradient)"/>
+    <path d="M54 0h16c13.255 0 24 10.745 24 24v32H86V24c0-5.523-4.477-10-10-10H70v42H54V0z" fill="#0f172a"/>
+  </g>
+  <text x="140" y="46" font-family="Inter, system-ui, sans-serif" font-size="28" fill="#0f172a" font-weight="600">
+    Johinke Development
+  </text>
+</svg>

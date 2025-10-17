@@ -1,0 +1,2175 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { loadGoogleMapsApi } from "../lib/googleMaps";
+
+type PlanningSource = {
+  label: string;
+  url: string;
+};
+
+type SiteMetric = {
+  id: string;
+  label: string;
+  value: string;
+  linkLabel: string;
+  linkUrl: string;
+};
+
+type GoverningFactor = {
+  label: string;
+  value: string;
+  note?: string;
+  source?: PlanningSource;
+};
+
+type FsrHeightBonus = {
+  label: string;
+  fsr: string;
+  height: string;
+  trigger: string;
+  source?: PlanningSource;
+};
+
+type PlanningOptionCategory = "cdc" | "lmr-hda" | "da";
+
+type PlanningOption = {
+  slug: string;
+  title: string;
+  category: PlanningOptionCategory;
+  permissibility: string;
+  isPermitted: boolean;
+  status?: "permitted" | "conditional" | "prohibited";
+  rationale: string;
+  zoneCompatibility: string;
+  constraints: string[];
+  governingFactors?: GoverningFactor[];
+  envelopeHint: string;
+  fsrHeightBonuses?: FsrHeightBonus[];
+  notes?: string[];
+  clauses: PlanningSource[];
+};
+
+type PlanningOptionColumn = {
+  key: PlanningOptionCategory;
+  heading: string;
+  description: string;
+  options: PlanningOption[];
+};
+
+type Recommendation = {
+  category: string;
+  title: string;
+  detail: string;
+  sources: PlanningSource[];
+};
+
+type ComparableSale = {
+  address: string;
+  type: string;
+  saleDate: string;
+  salePrice: number | null;
+  year?: number | null;
+  comment: string;
+  description: string;
+  latitude?: number;
+  longitude?: number;
+  landAreaSquareMeters?: number | null;
+  source: PlanningSource;
+};
+
+type DevelopmentActivity = {
+  applicationNumber: string;
+  address: string;
+  description: string;
+  status: string;
+  decisionDate: string;
+  source: PlanningSource;
+};
+
+type SimilarApprovedProject = {
+  title: string;
+  address: string;
+  approvalDate: string;
+  headlineMetric: string;
+  link: PlanningSource;
+};
+
+type BuildCostItem = {
+  type: string;
+  amount: number;
+  ratePerSquareMetre?: number;
+  note?: string;
+};
+
+type Feasibility = {
+  summary: string;
+  assumptions: string[];
+  metrics: {
+    totalGrossRealisation: number;
+    totalDevelopmentCost: number;
+    netProfitBeforeTax: number;
+    netProfitMarginPercent: number;
+    marginOnCostPercent: number;
+    marginOnGrossDevelopmentValuePercent: number;
+  };
+  costBreakdown: {
+    landCost: number;
+    buildCost: BuildCostItem[];
+    softCosts: number;
+    holdingCosts?: number;
+    contingencyPercent?: number;
+    saleComparables: string[];
+  };
+  decision: {
+    goNoGo: string;
+    recommendation: string;
+    rationale: string;
+  };
+  sources: PlanningSource[];
+};
+
+type RecommendationSummary = {
+  headline: string;
+  status: string;
+  rationalePoints: string[];
+  nextSteps: string[];
+  risks?: string[];
+  confidenceRating?: string;
+  tagline?: string;
+};
+
+type PlanningResult = {
+  site: {
+    address: string;
+    lotPlan: string;
+    localGovernmentArea: string;
+    zoning: string;
+    floorSpaceRatio: string;
+    heightOfBuildings: string;
+    minLotSize: string;
+    mapPreviewUrl: string;
+    latitude?: number;
+    longitude?: number;
+    generatedAt?: string;
+    metrics: SiteMetric[];
+    dataSources: PlanningSource[];
+    guidelineLinks: PlanningSource[];
+    streetViewAvailable: boolean;
+    locationalInsights: {
+      todArea: {
+        isWithin: boolean;
+        label: string | null;
+        className: string | null;
+        mapName: string | null;
+      };
+      acceleratedPrecinct: {
+        isWithin: boolean;
+        label: string | null;
+        mapName: string | null;
+      };
+      deferredArea: {
+        isWithin: boolean;
+        label: string | null;
+        mapName: string | null;
+      };
+      nearestTownCentre: {
+        name: string;
+        className: string | null;
+        distanceMeters: number;
+        band: "inner" | "outer" | null;
+      } | null;
+    };
+  };
+  planningOptions: PlanningOption[];
+  recommendations: Recommendation[];
+  comparableSales: ComparableSale[];
+  developmentActivity: DevelopmentActivity[];
+  similarApprovedProjects: SimilarApprovedProject[];
+  feasibility: Feasibility;
+  recommendationSummary: RecommendationSummary;
+};
+
+type PlanningResponse = {
+  ok: boolean;
+  data?: PlanningResult;
+  error?: string;
+};
+const suggestionSamples = [
+  "1 The Strand, Dee Why NSW",
+  "15 Howard Avenue, Dee Why NSW",
+  "24 Ocean Road, Palm Beach NSW",
+  "88 Pittwater Road, Manly NSW",
+  "102 Barrenjoey Road, Mona Vale NSW"
+];
+
+const currencyFormatter = new Intl.NumberFormat("en-AU", {
+  style: "currency",
+  currency: "AUD"
+});
+
+const numberFormatter = new Intl.NumberFormat("en-AU", {
+  maximumFractionDigits: 0
+});
+
+const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+
+const glossaryEntries: Array<{ term: string; definition: string }> = [
+  { term: "Apartment Design Guide (ADG)", definition: "Apartment Design Guide" },
+  { term: "AS2890", definition: "Australian Standard 2890 (Parking Facilities)" },
+  { term: "Building Sustainability Index (BASIX)", definition: "Building Sustainability Index" },
+  { term: "Complying Development Certificate (CDC)", definition: "Complying Development Certificate" },
+  { term: "Development Application (DA)", definition: "Development Application" },
+  { term: "DCP", definition: "Development Control Plan" },
+  { term: "Floor Space Ratio (FSR)", definition: "Floor Space Ratio" },
+  { term: "Housing Diversity Amendment (HDA)", definition: "Housing Diversity Amendment" },
+  { term: "HOB", definition: "Height of Buildings" },
+  { term: "LGA", definition: "Local Government Area" },
+  { term: "Low and Mid-Rise (LMR)", definition: "Low and Mid-Rise housing program" },
+  { term: "National Construction Code (NCC)", definition: "National Construction Code" },
+  { term: "SEPP", definition: "State Environmental Planning Policy" },
+  { term: "State Significant Development (SSD)", definition: "State Significant Development" },
+  { term: "Transport Oriented Development (TOD)", definition: "Transport Oriented Development" },
+  { term: "Voluntary Planning Agreement (VPA)", definition: "Voluntary Planning Agreement" }
+];
+
+const buildStaticMapUrl = (latitude?: number, longitude?: number) => {
+  if (latitude === undefined || longitude === undefined) return null;
+  if (!GOOGLE_MAPS_KEY) return null;
+  const params = new URLSearchParams({
+    center: `${latitude},${longitude}`,
+    zoom: "19",
+    size: "640x400",
+    scale: "2",
+    maptype: "satellite",
+    markers: `color:0x2563EB|${latitude},${longitude}`,
+    key: GOOGLE_MAPS_KEY
+  });
+  return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+};
+
+const buildStreetViewUrl = (latitude?: number, longitude?: number) => {
+  if (latitude === undefined || longitude === undefined) return null;
+  if (!GOOGLE_MAPS_KEY) return null;
+  const params = new URLSearchParams({
+    size: "640x400",
+    location: `${latitude},${longitude}`,
+    fov: "75",
+    pitch: "0",
+    source: "outdoor",
+    key: GOOGLE_MAPS_KEY
+  });
+  return `https://maps.googleapis.com/maps/api/streetview?${params.toString()}`;
+};
+
+const buildComparablesMapUrl = (
+  site: Pick<PlanningResult['site'], 'latitude' | 'longitude' | 'mapPreviewUrl'>,
+  comparables: ComparableSale[]
+) => {
+  const points: Array<{ latitude: number; longitude: number; label: string }> = [];
+
+  if (
+    site.latitude !== undefined &&
+    site.longitude !== undefined &&
+    Number.isFinite(site.latitude) &&
+    Number.isFinite(site.longitude)
+  ) {
+    points.push({ latitude: site.latitude, longitude: site.longitude, label: "S" });
+  }
+
+  comparables.forEach((sale, index) => {
+    if (
+      sale.latitude !== undefined &&
+      sale.longitude !== undefined &&
+      Number.isFinite(sale.latitude) &&
+      Number.isFinite(sale.longitude)
+    ) {
+      points.push({
+        latitude: sale.latitude,
+        longitude: sale.longitude,
+        label: String(index + 1)
+      });
+    }
+  });
+
+  if (points.length === 0) {
+    return site.mapPreviewUrl;
+  }
+
+  const latitudes = points.map((point) => point.latitude);
+  const longitudes = points.map((point) => point.longitude);
+  const minLat = Math.min(...latitudes);
+  const maxLat = Math.max(...latitudes);
+  const minLon = Math.min(...longitudes);
+  const maxLon = Math.max(...longitudes);
+  const centerLat = (minLat + maxLat) / 2;
+  const centerLon = (minLon + maxLon) / 2;
+  const diffLat = Math.max(0.0001, maxLat - minLat);
+  const diffLon = Math.max(0.0001, maxLon - minLon);
+  const maxDiff = Math.max(diffLat, diffLon);
+
+  let zoom = 14;
+  if (maxDiff < 0.002) zoom = 17;
+  else if (maxDiff < 0.005) zoom = 16;
+  else if (maxDiff < 0.01) zoom = 15;
+  else if (maxDiff < 0.02) zoom = 14;
+  else if (maxDiff < 0.05) zoom = 13;
+  else if (maxDiff < 0.1) zoom = 12;
+  else zoom = 11;
+
+  if (GOOGLE_MAPS_KEY) {
+    const params = new URLSearchParams({
+      center: `${centerLat},${centerLon}`,
+      zoom: zoom.toString(),
+      size: "640x400",
+      scale: "2",
+      maptype: "roadmap",
+      key: GOOGLE_MAPS_KEY
+    });
+
+    points.forEach((point) => {
+      const style =
+        point.label === "S" ? "color:0xDC2626|label:S" : `color:0x1D4ED8|label:${point.label}`;
+      params.append("markers", `${style}|${point.latitude},${point.longitude}`);
+    });
+
+    return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
+  }
+
+  const markerParams = points
+    .map((point) => {
+      const style = point.label === "S" ? "red-pushpin" : "lightblue1";
+      return `markers=${point.latitude},${point.longitude},${style}`;
+    })
+    .join("&");
+
+  return `https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLon}&zoom=${zoom}&size=640x400&${markerParams}`;
+};
+export default function AddressSearch() {
+  const [address, setAddress] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<PlanningResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [mapsReady, setMapsReady] = useState(false);
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+
+  useEffect(() => {
+    if (!GOOGLE_MAPS_KEY || typeof window === "undefined") {
+      return;
+    }
+
+    let cancelled = false;
+
+    loadGoogleMapsApi(GOOGLE_MAPS_KEY, ["places"])
+      .then(() => {
+        if (!cancelled) setMapsReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setMapsReady(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapsReady || !inputRef.current || !window.google?.maps?.places) {
+      return;
+    }
+
+    const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+      componentRestrictions: { country: "au" },
+      fields: ["formatted_address"]
+    });
+    autocompleteRef.current = autocomplete;
+
+    const listener = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      if (place.formatted_address) {
+        setAddress(place.formatted_address);
+        setSuggestions([]);
+      }
+    });
+
+    return () => {
+      window.google.maps.event.removeListener(listener);
+      autocompleteRef.current = null;
+    };
+  }, [mapsReady]);
+
+  const updateSuggestions = (value: string) => {
+    if (mapsReady) {
+      setSuggestions([]);
+      return;
+    }
+
+    if (value.length < 3) {
+      setSuggestions([]);
+      return;
+    }
+
+    const filtered = suggestionSamples
+      .filter((item) => item.toLowerCase().includes(value.toLowerCase()))
+      .slice(0, 5);
+
+    setSuggestions(filtered.length > 0 ? filtered : suggestionSamples.slice(0, 3));
+  };
+
+  const handleSearch = async () => {
+    if (!address.trim()) {
+      setError("Please enter an address to continue.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const res = await fetch(
+        "/api/nswPlanningAtPoint?address=" + encodeURIComponent(address.trim())
+      );
+      if (!res.ok) {
+        throw new Error("HTTP " + res.status);
+      }
+      const payload: PlanningResponse = await res.json();
+
+      if (!payload.ok || !payload.data) {
+        throw new Error(payload.error ?? "No data returned");
+      }
+
+      setResult(payload.data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch data";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ marginTop: "2rem", display: "grid", gap: "1.5rem" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={address}
+          onChange={(e) => {
+            const next = e.target.value;
+            setAddress(next);
+            updateSuggestions(next);
+          }}
+          placeholder="Enter Property Address"
+          style={{ padding: "0.5rem", minWidth: "260px", flex: "1 0 240px" }}
+          list={!mapsReady ? "address-suggestions" : undefined}
+          autoComplete="off"
+          aria-label="Enter a property address in New South Wales"
+        />
+        <button onClick={handleSearch} disabled={loading}>
+          {loading ? "Analysing…" : "Analyse Site"}
+        </button>
+      </div>
+
+      {!mapsReady && (
+        <datalist id="address-suggestions">
+          {suggestions.map((item) => (
+            <option key={item} value={item} />
+          ))}
+        </datalist>
+      )}
+
+      {error && <p style={{ color: "red", margin: 0 }}>{error}</p>}
+
+      {result && <ResultDisplay result={result} mapsReady={mapsReady} />}
+    </div>
+  );
+}
+type ResultDisplayProps = {
+  result: PlanningResult;
+  mapsReady: boolean;
+};
+
+function ResultDisplay({ result, mapsReady }: ResultDisplayProps) {
+  const {
+    site,
+    planningOptions,
+    recommendations,
+    comparableSales,
+    developmentActivity,
+    similarApprovedProjects,
+    feasibility,
+    recommendationSummary
+  } = result;
+
+  const planningColumns = useMemo<PlanningOptionColumn[]>(() => {
+    const columnPresets: Array<{
+      key: PlanningOptionCategory;
+      heading: string;
+      description: string;
+    }> = [
+      {
+        key: "lmr-hda",
+        heading: "Low and Mid-Rise (LMR) and Housing Diversity Amendment (HDA) uplift (apartments)",
+        description:
+          "Low and Mid-Rise / Housing Diversity Amendment uplift opportunities within Transport Oriented Development (TOD) and town centre programs."
+      },
+      {
+        key: "cdc",
+        heading: "Complying Development Certificate (CDC) pathways - duplex & terrace",
+        description:
+          "Complying Development Certificate options for duplex and terrace delivery where Codes SEPP criteria are satisfied."
+      },
+      {
+        key: "da",
+        heading: "Development Application (DA) pathways - merit assessment",
+        description:
+          "Development Application routes (duplex, terraces, apartments) including clause 4.6 and design excellence pathways."
+      }
+    ];
+
+    return columnPresets
+      .map((preset) => ({
+        ...preset,
+        options: planningOptions.filter((option) => option.category === preset.key)
+      }))
+      .filter((column) => column.options.length > 0);
+  }, [planningOptions]);
+
+  const pricedComparableSales = useMemo(
+    () => comparableSales.filter((sale) => sale.salePrice !== null && sale.salePrice !== undefined),
+    [comparableSales]
+  );
+
+  const buildCostTotal = feasibility.costBreakdown.buildCost.reduce(
+    (acc, item) => acc + item.amount,
+    0
+  );
+  const softCostsValue = feasibility.costBreakdown.softCosts ?? 0;
+  const holdingCostsValue = feasibility.costBreakdown.holdingCosts ?? 0;
+  const totalCost =
+    feasibility.costBreakdown.landCost + buildCostTotal + softCostsValue + holdingCostsValue;
+
+  const feasibilityRows = [
+    {
+      item: "Land Cost",
+      estimate: currencyFormatter.format(feasibility.costBreakdown.landCost),
+      note: "Market estimate"
+    },
+    {
+      item: "Build Cost",
+      estimate: currencyFormatter.format(buildCostTotal),
+      note: "Based on current specification"
+    },
+    {
+      item: "Soft Costs",
+      estimate: currencyFormatter.format(softCostsValue),
+      note: "Consultants and approvals"
+    },
+    {
+      item: "Holding Costs",
+      estimate: currencyFormatter.format(holdingCostsValue),
+      note: "Finance and council rates"
+    },
+    {
+      item: "Total Cost",
+      estimate: currencyFormatter.format(totalCost),
+      note: "Land + build + soft + holding"
+    },
+    {
+      item: "Total Revenue",
+      estimate: currencyFormatter.format(feasibility.metrics.totalGrossRealisation),
+      note: "Based on comparable sales"
+    },
+    {
+      item: "Net Profit (pre-tax)",
+      estimate: currencyFormatter.format(feasibility.metrics.netProfitBeforeTax),
+      note: `Margin ${feasibility.metrics.marginOnCostPercent}%`
+    }
+  ];
+
+  const recommendationGroups = useMemo(
+    () => [
+      {
+        title: "Proceedable Pathways",
+        accentColor: "#10b981",
+        items: recommendations.filter(
+          (item) => item.category.toLowerCase() === "proceedable pathways"
+        )
+      },
+      {
+        title: "Risk Flags",
+        accentColor: "#f97316",
+        items: recommendations.filter((item) => item.category.toLowerCase() === "risk flags")
+      },
+      {
+        title: "Further Investigation",
+        accentColor: "#0ea5e9",
+        items: recommendations.filter(
+          (item) => item.category.toLowerCase() === "further investigation"
+        )
+      },
+      {
+        title: "High Risk / Likely Refusal",
+        accentColor: "#ef4444",
+        items: recommendations.filter(
+          (item) => item.category.toLowerCase() === "high risk / likely refusal"
+        )
+      }
+    ],
+    [recommendations]
+  );
+
+  const generatedAtDisplay = site.generatedAt
+    ? new Date(site.generatedAt).toLocaleString("en-AU", { timeZone: "Australia/Sydney" })
+    : null;
+  const dataSourceSummary = site.dataSources.map((source) => source.label).join(", ");
+  const comparableSourceLabels = Array.from(
+    new Set(pricedComparableSales.map((sale) => sale.source.label))
+  );
+
+  return (
+    <div
+      style={{
+        border: "1px solid #d0d7de",
+        borderRadius: "16px",
+        padding: "1.75rem",
+        display: "grid",
+        gap: "2.5rem",
+        backgroundColor: "#f8fafc",
+        maxWidth: "1200px",
+        width: "100%",
+        margin: "0 auto"
+      }}
+    >
+      <MapImagery site={site} mapsReady={mapsReady} />
+
+      <section style={{ display: "grid", gap: "1.25rem" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
+            2. Site Data & Zoning Summary
+          </h2>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+            Controls sourced from the relevant Local Environmental Plan and NSW Planning Portal
+            datasets. Linked clauses provide authoritative mapping references.
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gap: "1.5rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gap: "0.8rem",
+              gridTemplateColumns: "1fr"
+            }}
+          >
+            {site.metrics.map((metric) => (
+              <article
+                key={metric.id}
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #d0d7de",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  display: "grid",
+                  gap: "0.45rem"
+                }}
+              >
+                <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{metric.label}</span>
+                <strong style={{ fontSize: "1.1rem", color: "#0f172a" }}>{metric.value}</strong>
+                <a
+                  href={metric.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: "0.85rem" }}
+                >
+                  {metric.linkLabel}
+                </a>
+              </article>
+            ))}
+          </div>
+
+          <dl
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr",
+              gap: "0.75rem"
+            }}
+          >
+            {siteSummaryEntries(site).map(({ label, value }) => (
+              <div key={label}>
+                <dt style={{ fontWeight: 600, color: "#1f2937" }}>{label}</dt>
+                <dd style={{ margin: 0, color: "#475569" }}>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+
+        <SourceList heading="Primary datasets" items={site.dataSources} />
+        {generatedAtDisplay && (
+          <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748b" }}>
+            Data captured {generatedAtDisplay} AEST from {dataSourceSummary || "project datasets"}.
+          </p>
+        )}
+      </section>
+
+      <section style={{ display: "grid", gap: "1.25rem" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
+            3. Planning Options
+          </h2>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+            Review available approval pathways. Cards highlight key controls and the summary table
+            translates each pathway into a GO / NO-GO call.
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gap: "1.5rem" }}>
+          {planningColumns.map((column) => (
+            <div key={column.key} style={{ display: "grid", gap: "0.9rem" }}>
+              <div>
+                <h3 style={{ margin: 0, color: "#0f172a" }}>{column.heading}</h3>
+                <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.5 }}>
+                  {column.description}
+                </p>
+              </div>
+              <div style={{ display: "grid", gap: "1rem" }}>
+                {column.options.map((option) => (
+                  <PlanningOptionCard key={option.slug} option={option} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <PlanningOptionSummaryTable options={planningOptions} />
+        {generatedAtDisplay && (
+          <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748b" }}>
+            Planning pathway data captured {generatedAtDisplay} AEST. Sources include NSW Housing
+            SEPP datasets and listed clauses.
+          </p>
+        )}
+      </section>
+      <RecommendationSummarySection summary={recommendationSummary} />
+
+      <section style={{ display: "grid", gap: "1.25rem" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
+            5. Additional Guidance
+          </h2>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+            Use these action cards to progress the preferred pathway while managing identified
+            risks and investigation items.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gap: "1.25rem",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))"
+          }}
+        >
+          {recommendationGroups.map((group) => (
+            <RecommendationColumn
+              key={group.title}
+              title={group.title}
+              items={group.items}
+              accentColor={group.accentColor}
+            />
+          ))}
+        </div>
+      </section>
+
+      <section style={{ display: "grid", gap: "1.25rem" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
+            6. Comparable Sales & Development Activity
+          </h2>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+            Comparable evidence and nearby development activity sourced from NSW Planning Portal
+            and market intelligence datasets.
+          </p>
+        </div>
+
+        <ComparableSalesMap site={site} comparables={comparableSales} mapsReady={mapsReady} />
+
+        <div style={{ display: "grid", gap: "1.5rem" }}>
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #d0d7de",
+              borderRadius: "12px",
+              padding: "1.25rem",
+              display: "grid",
+              gap: "1rem"
+            }}
+          >
+            <header>
+              <h3 style={{ margin: 0, color: "#0f172a" }}>Sales Comparables</h3>
+              <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>
+                Evidence of duplex, terrace, and Low and Mid-Rise (LMR) outcomes supporting the feasibility assumptions.
+              </p>
+            </header>
+            {pricedComparableSales.length === 0 ? (
+              <p style={{ margin: 0, color: "#475569" }}>
+                No priced comparable sales available for this search.
+              </p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    minWidth: "720px",
+                    fontSize: "0.9rem"
+                  }}
+                >
+                  <thead>
+                    <tr style={{ backgroundColor: "#f1f5f9" }}>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>#</th>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>Address</th>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>Type</th>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>Sale date</th>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>Price</th>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>Land area</th>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>$/m2</th>
+                      <th style={{ textAlign: "left", padding: "0.6rem", color: "#475569" }}>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pricedComparableSales.map((sale, index) => {
+                      const saleDateLabel = sale.saleDate
+                        ? new Date(sale.saleDate).toLocaleDateString("en-AU")
+                        : "Unknown";
+                      const priceLabel =
+                        sale.salePrice !== null && sale.salePrice !== undefined
+                          ? currencyFormatter.format(sale.salePrice)
+                          : "Price unavailable";
+                      const landArea =
+                        sale.landAreaSquareMeters !== null && sale.landAreaSquareMeters !== undefined
+                          ? `${numberFormatter.format(sale.landAreaSquareMeters)} m2`
+                          : "N/A";
+                      const rateLabel =
+                        sale.salePrice !== null &&
+                        sale.salePrice !== undefined &&
+                        sale.landAreaSquareMeters !== null &&
+                        sale.landAreaSquareMeters !== undefined &&
+                        sale.landAreaSquareMeters > 0
+                          ? `${currencyFormatter.format(
+                              sale.salePrice / sale.landAreaSquareMeters
+                            )}/m2`
+                          : "N/A";
+
+                      return (
+                        <tr key={sale.address + sale.saleDate} style={{ borderTop: "1px solid #e2e8f0" }}>
+                          <td style={{ padding: "0.6rem", color: "#334155" }}>{index + 1}</td>
+                          <td style={{ padding: "0.6rem", color: "#0f172a", fontWeight: 600 }}>
+                            <div>{sale.address}</div>
+                            {sale.comment && (
+                              <div style={{ color: "#64748b", fontSize: "0.8rem", marginTop: "0.2rem" }}>
+                                {sale.comment}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: "0.6rem", color: "#475569" }}>{sale.type}</td>
+                          <td style={{ padding: "0.6rem", color: "#475569" }}>{saleDateLabel}</td>
+                          <td style={{ padding: "0.6rem", color: "#475569" }}>{priceLabel}</td>
+                          <td style={{ padding: "0.6rem", color: "#475569" }}>{landArea}</td>
+                          <td style={{ padding: "0.6rem", color: "#475569" }}>{rateLabel}</td>
+                          <td style={{ padding: "0.6rem" }}>
+                            <a
+                              href={sale.source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ color: "#1d4ed8" }}
+                            >
+                              {sale.source.label}
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p style={{ margin: 0, fontSize: "0.8rem", color: "#64748b" }}>
+              Comparable data sourced from NSW Planning & CoreLogic APIs.
+            </p>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #d0d7de",
+              borderRadius: "12px",
+              padding: "1.25rem",
+              display: "grid",
+              gap: "1rem"
+            }}
+          >
+            <header>
+              <h3 style={{ margin: 0, color: "#0f172a" }}>Nearby Development Applications</h3>
+              <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>
+                Council and state assessed applications signalling appetite for uplift in the area.
+              </p>
+            </header>
+            <div style={{ display: "grid", gap: "0.85rem" }}>
+              {developmentActivity.map((item) => (
+                <article
+                  key={item.applicationNumber}
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "10px",
+                    padding: "0.85rem",
+                    display: "grid",
+                    gap: "0.35rem",
+                    backgroundColor: "#fdf4ff"
+                  }}
+                >
+                  <strong style={{ color: "#0f172a" }}>
+                    {item.applicationNumber} • {item.status}
+                  </strong>
+                  <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                    {item.address} • Decided {new Date(item.decisionDate).toLocaleDateString("en-AU")}
+                  </span>
+                  <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
+                    {item.description}
+                  </p>
+                  <SourceList heading="Source" items={[item.source]} />
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div
+            style={{
+              backgroundColor: "#ffffff",
+              border: "1px solid #d0d7de",
+              borderRadius: "12px",
+              padding: "1.25rem",
+              display: "grid",
+              gap: "1rem"
+            }}
+          >
+            <header>
+              <h3 style={{ margin: 0, color: "#0f172a" }}>Similar Approved Projects</h3>
+              <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>
+                Benchmark consents to test design language, staging, and conditions of approval.
+              </p>
+            </header>
+            <div style={{ display: "grid", gap: "0.85rem" }}>
+              {similarApprovedProjects.map((project) => (
+                <article
+                  key={project.title}
+                  style={{
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "10px",
+                    padding: "0.85rem",
+                    display: "grid",
+                    gap: "0.35rem",
+                    backgroundColor: "#ecfeff"
+                  }}
+                >
+                  <strong style={{ color: "#0f172a" }}>{project.title}</strong>
+                  <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                    {project.address} • Approved {new Date(project.approvalDate).toLocaleDateString("en-AU")}
+                  </span>
+                  <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
+                    {project.headlineMetric}
+                  </p>
+                  <SourceList heading="Documentation" items={[project.link]} />
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+      <section>
+        <h2 style={{ marginBottom: "1rem", fontSize: "1.6rem", color: "#0f172a" }}>
+          7. Feasibility Snapshot
+        </h2>
+        <article
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #d0d7de",
+            borderRadius: "12px",
+            padding: "1.25rem",
+            display: "grid",
+            gap: "1.25rem"
+          }}
+        >
+          <div>
+            <h3 style={{ margin: 0, color: "#0f172a" }}>Summary</h3>
+            <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>{feasibility.summary}</p>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                minWidth: "460px"
+              }}
+            >
+              <thead>
+                <tr>
+                  {['Item', 'Estimate', 'Notes'].map((heading) => (
+                    <th
+                      key={heading}
+                      style={{
+                        textAlign: "left",
+                        padding: "0.75rem",
+                        fontSize: "0.85rem",
+                        backgroundColor: "#f1f5f9",
+                        color: "#0f172a",
+                        borderBottom: "1px solid #cbd5f5"
+                      }}
+                    >
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {feasibilityRows.map((row) => (
+                  <tr key={row.item}>
+                    <td
+                      style={{
+                        padding: "0.75rem",
+                        borderTop: "1px solid #dfe3f0",
+                        color: "#1e293b",
+                        fontWeight: 600,
+                        width: "30%"
+                      }}
+                    >
+                      {row.item}
+                    </td>
+                    <td
+                      style={{
+                        padding: "0.75rem",
+                        borderTop: "1px solid #dfe3f0",
+                        color: "#1d4ed8",
+                        fontWeight: 600,
+                        width: "30%"
+                      }}
+                    >
+                      {row.estimate}
+                    </td>
+                    <td
+                      style={{
+                        padding: "0.75rem",
+                        borderTop: "1px solid #dfe3f0",
+                        color: "#475569"
+                      }}
+                    >
+                      {row.note || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h3 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Assumptions</h3>
+            <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "#475569" }}>
+              {feasibility.assumptions.map((assumption) => (
+                <li key={assumption}>{assumption}</li>
+              ))}
+            </ul>
+          </div>
+          <p style={{ margin: 0, color: "#0f172a", fontWeight: 600 }}>
+            {feasibility.decision.rationale}
+          </p>
+          <SourceList heading="Feasibility sources" items={feasibility.sources} />
+        </article>
+      </section>
+
+      <section>
+        <h2 style={{ marginBottom: "1rem", fontSize: "1.6rem", color: "#0f172a" }}>
+          8. Technical Glossary
+        </h2>
+        <article
+          style={{
+            backgroundColor: "#ffffff",
+            border: "1px solid #d0d7de",
+            borderRadius: "12px",
+            padding: "1.25rem",
+            display: "grid",
+            gap: "0.75rem"
+          }}
+        >
+          <p style={{ margin: 0, color: "#475569" }}>
+            Abbreviations used throughout the report are expanded here for clarity.
+          </p>
+          <dl
+            style={{
+              display: "grid",
+              gap: "0.6rem",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              margin: 0
+            }}
+          >
+            {glossaryEntries.map((entry) => (
+              <div key={entry.term}>
+                <dt style={{ fontWeight: 600, color: "#0f172a" }}>{entry.term}</dt>
+                <dd style={{ margin: 0, color: "#475569" }}>{entry.definition}</dd>
+              </div>
+            ))}
+          </dl>
+        </article>
+      </section>
+    </div>
+  );
+}
+type MapImageryProps = {
+  site: PlanningResult['site'];
+  mapsReady: boolean;
+};
+
+function MapImagery({ site, mapsReady }: MapImageryProps) {
+  const fallbackImage = site.mapPreviewUrl;
+  const staticMapUrl = buildStaticMapUrl(site.latitude, site.longitude) ?? fallbackImage;
+  const streetViewFallback =
+    site.streetViewAvailable && GOOGLE_MAPS_KEY
+      ? buildStreetViewUrl(site.latitude, site.longitude)
+      : null;
+
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const mapMarkerRef = useRef<google.maps.Marker | null>(null);
+  const streetViewRef = useRef<HTMLDivElement | null>(null);
+  const streetViewInstanceRef = useRef<google.maps.StreetViewPanorama | null>(null);
+
+  const canRenderInteractiveMap =
+    mapsReady &&
+    site.latitude !== undefined &&
+    site.longitude !== undefined &&
+    Number.isFinite(site.latitude) &&
+    Number.isFinite(site.longitude);
+
+  const canRenderStreetView =
+    mapsReady &&
+    site.streetViewAvailable &&
+    site.latitude !== undefined &&
+    site.longitude !== undefined &&
+    Number.isFinite(site.latitude) &&
+    Number.isFinite(site.longitude);
+
+  useEffect(() => {
+    if (!canRenderInteractiveMap || !mapContainerRef.current) {
+      return;
+    }
+    const googleMaps = window.google;
+    const position = { lat: site.latitude as number, lng: site.longitude as number };
+
+    if (!mapInstanceRef.current) {
+      mapInstanceRef.current = new googleMaps.maps.Map(mapContainerRef.current, {
+        center: position,
+        zoom: 19,
+        mapTypeId: "satellite",
+        disableDefaultUI: true,
+        clickableIcons: false
+      });
+    } else {
+      mapInstanceRef.current.setCenter(position);
+      mapInstanceRef.current.setZoom(19);
+    }
+    if (!mapMarkerRef.current) {
+      mapMarkerRef.current = new googleMaps.maps.Marker({
+        position,
+        map: mapInstanceRef.current,
+        title: site.address ?? "Selected site"
+      });
+    } else {
+      mapMarkerRef.current.setPosition(position);
+      mapMarkerRef.current.setMap(mapInstanceRef.current);
+    }
+  }, [canRenderInteractiveMap, site.address, site.latitude, site.longitude]);
+
+  useEffect(() => {
+    if (!streetViewRef.current) {
+      return;
+    }
+
+    if (!canRenderStreetView) {
+      if (streetViewInstanceRef.current) {
+        streetViewInstanceRef.current.setVisible(false);
+        streetViewInstanceRef.current = null;
+      }
+      return;
+    }
+
+    const googleMaps = window.google;
+    streetViewInstanceRef.current = new googleMaps.maps.StreetViewPanorama(
+      streetViewRef.current,
+      {
+        position: { lat: site.latitude as number, lng: site.longitude as number },
+        pov: { heading: 0, pitch: 0 },
+        zoom: 1,
+        disableDefaultUI: true
+      }
+    );
+
+    return () => {
+      streetViewInstanceRef.current?.setVisible(false);
+      streetViewInstanceRef.current = null;
+    };
+  }, [canRenderStreetView, site.latitude, site.longitude]);
+
+  useEffect(() => {
+    if (!canRenderInteractiveMap && mapMarkerRef.current) {
+      mapMarkerRef.current.setMap(null);
+      mapMarkerRef.current = null;
+    }
+  }, [canRenderInteractiveMap]);
+
+  return (
+    <section style={{ display: "grid", gap: "1rem" }}>
+      <div>
+        <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
+          1. Site Context
+        </h2>
+        <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+          Visualise the parcel immediately after entering the address. Satellite imagery centres on
+          the lot and Street View appears whenever Google coverage is available for the frontage.
+        </p>
+      </div>
+      {site.address && (
+        <p
+          style={{
+            margin: "0.5rem 0 0",
+            fontWeight: 600,
+            color: "#0f172a"
+          }}
+        >
+          {site.address}
+        </p>
+      )}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            canRenderStreetView || streetViewFallback
+              ? "repeat(auto-fit, minmax(280px, 1fr))"
+              : "minmax(280px, 1fr)",
+          gap: "1rem"
+        }}
+      >
+        <figure
+          style={{
+            margin: 0,
+            borderRadius: "16px",
+            overflow: "hidden",
+            border: "1px solid #cbd5f5",
+            backgroundColor: "#0f172a",
+            minHeight: "260px",
+            position: "relative"
+          }}
+        >
+          {canRenderInteractiveMap ? (
+            <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
+          ) : (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element -- Google Maps static image requires raw <img> */}
+              <img
+                src={staticMapUrl}
+                alt="Satellite map of the selected property"
+                style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
+              />
+              {!GOOGLE_MAPS_KEY && (
+                <figcaption
+                  style={{
+                    padding: "0.75rem 1rem",
+                    color: "#f8fafc",
+                    backgroundColor: "rgba(15, 23, 42, 0.75)"
+                  }}
+                >
+                  Add `NEXT_PUBLIC_GOOGLE_MAPS_KEY` to serve live satellite imagery.
+                </figcaption>
+              )}
+            </>
+          )}
+        </figure>
+        {(canRenderStreetView || streetViewFallback) && (
+          <figure
+            style={{
+              margin: 0,
+              borderRadius: "16px",
+              overflow: "hidden",
+              border: "1px solid #cbd5f5",
+              backgroundColor: "#0f172a",
+              minHeight: "260px",
+              position: "relative"
+            }}
+          >
+            {canRenderStreetView ? (
+              <div ref={streetViewRef} style={{ width: "100%", height: "100%" }} />
+            ) : (
+              streetViewFallback && (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- Google Street View static frame requires raw <img> */}
+                  <img
+                    src={streetViewFallback}
+                    alt="Street view perspective of the selected property"
+                    style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                </>
+              )
+            )}
+            <span
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                width: "16px",
+                height: "16px",
+                borderRadius: "999px",
+                backgroundColor: "rgba(37, 99, 235, 0.85)",
+                border: "2px solid #ffffff",
+                boxShadow: "0 0 6px rgba(15, 23, 42, 0.45)",
+                pointerEvents: "none"
+              }}
+            />
+          </figure>
+        )}
+      </div>
+      <p
+        style={{
+          margin: 0,
+          fontSize: "0.85rem",
+          color: "#64748b",
+          textAlign: "center"
+        }}
+      >
+        Powered by NSW Planning Portal & Google Maps
+      </p>
+      <SourceList heading="Key guidelines" items={site.guidelineLinks} />
+    </section>
+  );
+}
+
+type ComparableSalesMapProps = {
+  site: PlanningResult['site'];
+  comparables: ComparableSale[];
+  mapsReady: boolean;
+};
+
+function ComparableSalesMap({ site, comparables, mapsReady }: ComparableSalesMapProps) {
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const markerRefs = useRef<google.maps.Marker[]>([]);
+
+  const fallbackMapUrl = useMemo(
+    () =>
+      buildComparablesMapUrl(
+        { latitude: site.latitude, longitude: site.longitude, mapPreviewUrl: site.mapPreviewUrl },
+        comparables
+      ),
+    [site.latitude, site.longitude, site.mapPreviewUrl, comparables]
+  );
+
+  const canRenderInteractiveMap =
+    mapsReady &&
+    site.latitude !== undefined &&
+    site.longitude !== undefined &&
+    Number.isFinite(site.latitude) &&
+    Number.isFinite(site.longitude);
+
+  useEffect(() => {
+    if (!canRenderInteractiveMap || !mapContainerRef.current) {
+      return;
+    }
+    const googleMaps = window.google;
+    const map =
+      mapInstanceRef.current ??
+      new googleMaps.maps.Map(mapContainerRef.current, {
+        center: { lat: site.latitude as number, lng: site.longitude as number },
+        zoom: 14,
+        mapTypeId: "roadmap",
+        disableDefaultUI: true,
+        clickableIcons: false
+      });
+
+    mapInstanceRef.current = map;
+
+    markerRefs.current.forEach((marker) => marker.setMap(null));
+    markerRefs.current = [];
+
+    const bounds = new googleMaps.maps.LatLngBounds();
+
+    if (
+      site.latitude !== undefined &&
+      site.longitude !== undefined &&
+      Number.isFinite(site.latitude) &&
+      Number.isFinite(site.longitude)
+    ) {
+      const sitePosition = new googleMaps.maps.LatLng(
+        site.latitude as number,
+        site.longitude as number
+      );
+      const siteMarker = new googleMaps.maps.Marker({
+        map,
+        position: sitePosition,
+        label: { text: "S", color: "#ffffff", fontWeight: "700" },
+        icon: {
+          path: googleMaps.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: "#dc2626",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2
+        },
+        title: site.address
+      });
+      markerRefs.current.push(siteMarker);
+      bounds.extend(sitePosition);
+    }
+
+    const validComparables = comparables.filter(
+      (sale) =>
+        sale.latitude !== undefined &&
+        sale.longitude !== undefined &&
+        Number.isFinite(sale.latitude) &&
+        Number.isFinite(sale.longitude)
+    );
+
+    validComparables.forEach((sale, index) => {
+      const position = new googleMaps.maps.LatLng(
+        sale.latitude as number,
+        sale.longitude as number
+      );
+      const marker = new googleMaps.maps.Marker({
+        map,
+        position,
+        label: {
+          text: String(index + 1),
+          color: "#ffffff",
+          fontWeight: "700"
+        },
+        icon: {
+          path: googleMaps.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: "#1d4ed8",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2
+        },
+        title: sale.address
+      });
+      markerRefs.current.push(marker);
+      bounds.extend(position);
+    });
+
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, 48);
+    }
+  }, [canRenderInteractiveMap, comparables, site.address, site.latitude, site.longitude]);
+
+  useEffect(() => {
+    return () => {
+      markerRefs.current.forEach((marker) => marker.setMap(null));
+      markerRefs.current = [];
+      mapInstanceRef.current = null;
+    };
+  }, []);
+
+  if (!canRenderInteractiveMap) {
+    return (
+      <figure
+        style={{
+          margin: 0,
+          borderRadius: "12px",
+          overflow: "hidden",
+          border: "1px solid #d0d7de",
+          position: "relative",
+          backgroundColor: "#0f172a",
+          minHeight: "280px"
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- Static map placeholders require raw <img> */}
+        <img
+          src={fallbackMapUrl}
+          alt="Map of nearby sales and development activity"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        {!GOOGLE_MAPS_KEY && (
+          <figcaption
+            style={{
+              position: "absolute",
+              left: "1rem",
+              right: "1rem",
+              bottom: "3.2rem",
+              padding: "0.6rem 0.8rem",
+              borderRadius: "10px",
+              backgroundColor: "rgba(15, 23, 42, 0.75)",
+              color: "#f8fafc",
+              fontSize: "0.85rem",
+              lineHeight: 1.4
+            }}
+          >
+            {'Add `NEXT_PUBLIC_GOOGLE_MAPS_KEY` to display live comparative pins.'}
+          </figcaption>
+        )}
+        <figcaption
+          style={{
+            position: "absolute",
+            left: "1rem",
+            right: "1rem",
+            bottom: "1rem",
+            padding: "0.6rem 0.8rem",
+            borderRadius: "10px",
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            color: "#f8fafc",
+            fontSize: "0.85rem",
+            lineHeight: 1.4
+          }}
+        >
+          {'Site shown as red "S" pin. Comparable sales numbered 1-n in blue.'}
+        </figcaption>
+      </figure>
+    );
+  }
+
+  return (
+    <figure
+      style={{
+        margin: 0,
+        borderRadius: "12px",
+        overflow: "hidden",
+        border: "1px solid #d0d7de",
+        position: "relative",
+        backgroundColor: "#0f172a",
+        minHeight: "280px"
+      }}
+    >
+      <div ref={mapContainerRef} style={{ width: "100%", height: "100%" }} />
+      <figcaption
+        style={{
+          position: "absolute",
+          left: "1rem",
+          right: "1rem",
+          bottom: "1rem",
+          padding: "0.6rem 0.8rem",
+          borderRadius: "10px",
+          backgroundColor: "rgba(15, 23, 42, 0.6)",
+          color: "#f8fafc",
+          fontSize: "0.85rem",
+          lineHeight: 1.4
+        }}
+      >
+        {'Site shown as red "S" pin. Comparable sales numbered 1-n in blue.'}
+      </figcaption>
+    </figure>
+  );
+}
+type RecommendationSummarySectionProps = {
+  summary: RecommendationSummary;
+};
+
+function RecommendationSummarySection({ summary }: RecommendationSummarySectionProps) {
+  return (
+    <section style={{ display: "grid", gap: "1rem" }}>
+      <div>
+        <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
+          4. Recommendation Summary
+        </h2>
+        <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+          Snapshot of the recommended pathway, supporting rationale, and next steps.
+        </p>
+      </div>
+      <article
+        style={{
+          display: "grid",
+          gap: "1rem",
+          border: "1px solid #d0d7de",
+          borderRadius: "12px",
+          padding: "1.25rem",
+          backgroundColor: "#ffffff"
+        }}
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center" }}>
+          <h3 style={{ margin: 0, color: "#0f172a", fontSize: "1.35rem", flex: "1 1 260px" }}>
+            {summary.headline}
+          </h3>
+          <StatusBadge
+            label={summary.status}
+            status={summary.status.toLowerCase().includes("go") ? "permitted" : "conditional"}
+            fallbackPermitted
+          />
+        </div>
+        <div>
+          <h4 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Why this path</h4>
+          <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "#475569" }}>
+            {summary.rationalePoints.map((point) => (
+              <li key={point}>{point}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h4 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Next steps</h4>
+          <ol style={{ margin: 0, paddingLeft: "1.4rem", color: "#475569" }}>
+            {summary.nextSteps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+        </div>
+        {summary.risks && summary.risks.length > 0 && (
+          <div>
+            <h4 style={{ margin: "0 0 0.5rem", color: "#b91c1c" }}>Risks to manage</h4>
+            <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#b91c1c" }}>
+              {summary.risks.map((risk) => (
+                <li key={risk}>{risk}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {summary.confidenceRating && (
+          <p style={{ margin: 0, color: "#0f172a", fontWeight: 600 }}>
+            Confidence: {summary.confidenceRating}
+          </p>
+        )}
+        {summary.tagline && (
+          <p style={{ margin: 0, color: "#475569", fontStyle: "italic" }}>{summary.tagline}</p>
+        )}
+      </article>
+    </section>
+  );
+}
+
+type RecommendationColumnProps = {
+  title: string;
+  items: Recommendation[];
+  accentColor: string;
+};
+
+function RecommendationColumn({ title, items, accentColor }: RecommendationColumnProps) {
+  if (items.length === 0) return null;
+
+  return (
+    <section
+      style={{
+        border: `1px solid ${accentColor}`,
+        borderRadius: "12px",
+        padding: "1.25rem",
+        backgroundColor: "#ffffff",
+        display: "grid",
+        gap: "0.9rem"
+      }}
+    >
+      <h3 style={{ margin: 0, color: accentColor }}>{title}</h3>
+      <div style={{ display: "grid", gap: "0.85rem" }}>
+        {items.map((item) => (
+          <article
+            key={item.title}
+            style={{
+              border: "1px solid #e2e8f0",
+              borderRadius: "10px",
+              padding: "0.85rem",
+              display: "grid",
+              gap: "0.35rem",
+              backgroundColor: "#f8fafc"
+            }}
+          >
+            <strong style={{ color: "#0f172a" }}>{item.title}</strong>
+            <p style={{ margin: 0, color: "#475569" }}>{item.detail}</p>
+            <SourceList heading="Sources" items={item.sources} />
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+type PlanningOptionSummaryTableProps = {
+  options: PlanningOption[];
+};
+
+function PlanningOptionSummaryTable({ options }: PlanningOptionSummaryTableProps) {
+  if (options.length === 0) return null;
+
+  const categoryLabels: Record<PlanningOptionCategory, string> = {
+    "lmr-hda": "LMR / HDA",
+    cdc: "CDC",
+    da: "DA"
+  };
+
+  const rows = options.map((option) => {
+    const tone = option.status ?? (option.isPermitted ? "permitted" : "conditional");
+    const goNoGo =
+      tone === "permitted" ? "GO" : tone === "conditional" ? "GO (conditional)" : "NO-GO";
+    const palette =
+      tone === "permitted"
+        ? { bg: "#dcfce7", fg: "#166534" }
+        : tone === "conditional"
+        ? { bg: "#fef9c3", fg: "#92400e" }
+        : { bg: "#fee2e2", fg: "#b91c1c" };
+
+    return {
+      key: option.slug,
+      title: option.title,
+      category: categoryLabels[option.category] ?? option.category,
+      goNoGo,
+      palette,
+      trigger: option.permissibility
+    };
+  });
+
+  return (
+    <div
+      style={{
+        border: "1px solid #dbeafe",
+        borderRadius: "12px",
+        backgroundColor: "#ffffff",
+        boxShadow: "0 1px 0 rgba(15, 23, 42, 0.04)",
+        overflowX: "auto"
+      }}
+    >
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          minWidth: "560px"
+        }}
+      >
+        <caption
+          style={{
+            textAlign: "left",
+            padding: "1rem 1.25rem 0.5rem",
+            fontWeight: 600,
+            color: "#0f172a"
+          }}
+        >
+          GO / NO-GO summary
+        </caption>
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
+              Pathway
+            </th>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
+              Category
+            </th>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
+              Go / No-Go
+            </th>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
+              Key trigger
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.key} style={{ borderTop: "1px solid #e2e8f0" }}>
+              <td style={{ padding: "0.85rem 1.25rem", color: "#0f172a", fontWeight: 600 }}>
+                {row.title}
+              </td>
+              <td style={{ padding: "0.85rem 1.25rem", color: "#475569" }}>{row.category}</td>
+              <td style={{ padding: "0.85rem 1.25rem" }}>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "0.2rem 0.75rem",
+                    borderRadius: "999px",
+                    backgroundColor: row.palette.bg,
+                    color: row.palette.fg,
+                    fontWeight: 600,
+                    fontSize: "0.85rem"
+                  }}
+                >
+                  {row.goNoGo}
+                </span>
+              </td>
+              <td style={{ padding: "0.85rem 1.25rem", color: "#475569", lineHeight: 1.5 }}>
+                {row.trigger}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+type PlanningOptionCardProps = {
+  option: PlanningOption;
+};
+
+function PlanningOptionCard({ option }: PlanningOptionCardProps) {
+  const primaryConstraints = option.constraints.slice(0, 2);
+  const remainingConstraints = option.constraints.length - primaryConstraints.length;
+
+  return (
+    <article
+      style={{
+        border: "1px solid #dbeafe",
+        borderRadius: "12px",
+        backgroundColor: "#ffffff",
+        boxShadow: "0 1px 0 rgba(15, 23, 42, 0.05)"
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "0.9rem",
+          padding: "1rem 1.25rem"
+        }}
+      >
+        <div style={{ flex: "1 1 280px", minWidth: "240px" }}>
+          <h4 style={{ margin: 0, fontSize: "1.1rem", color: "#0f172a" }}>{option.title}</h4>
+          <p style={{ margin: "0.3rem 0 0", color: "#475569", lineHeight: 1.5 }}>
+            {option.rationale}
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+          <StatusBadge
+            label={option.permissibility}
+            status={option.status}
+            fallbackPermitted={option.isPermitted}
+          />
+        </div>
+        <div style={{ flex: "1 1 220px", minWidth: "220px" }}>
+          <strong
+            style={{
+              display: "block",
+              marginBottom: "0.35rem",
+              color: "#0f172a",
+              fontSize: "0.9rem"
+            }}
+          >
+            Zoning compatibility
+          </strong>
+          <p style={{ margin: 0, color: "#475569", lineHeight: 1.4 }}>{option.zoneCompatibility}</p>
+        </div>
+        {option.governingFactors && option.governingFactors.length > 0 && (
+          <div style={{ flex: "1 1 240px", minWidth: "220px" }}>
+            <strong
+              style={{
+                display: "block",
+                marginBottom: "0.35rem",
+                color: "#0f172a",
+                fontSize: "0.9rem"
+              }}
+            >
+              Governing factors
+            </strong>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: "0.85rem",
+                color: "#475569"
+              }}
+            >
+              <tbody>
+                {option.governingFactors.map((factor) => (
+                  <tr key={`${option.slug}-${factor.label}`} style={{ borderTop: "1px solid #e2e8f0" }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        fontWeight: 600,
+                        color: "#0f172a",
+                        padding: "0.4rem 0.6rem 0.4rem 0"
+                      }}
+                    >
+                      {factor.label}
+                    </th>
+                    <td style={{ padding: "0.4rem 0", lineHeight: 1.4 }}>
+                      <div>{factor.value}</div>
+                      {factor.note && (
+                        <div style={{ color: "#64748b", marginTop: "0.2rem" }}>{factor.note}</div>
+                      )}
+                      {factor.source && (
+                        <div style={{ marginTop: "0.3rem" }}>
+                          <a
+                            href={factor.source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "#1d4ed8" }}
+                          >
+                            {factor.source.label}
+                          </a>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {option.constraints.length > 0 && (
+          <div style={{ flex: "1 1 220px", minWidth: "220px" }}>
+            <strong
+              style={{
+                display: "block",
+                marginBottom: "0.35rem",
+                color: "#0f172a",
+                fontSize: "0.9rem"
+              }}
+            >
+              Key requirements
+            </strong>
+            <ul
+              style={{
+                margin: 0,
+                paddingLeft: "1.1rem",
+                display: "grid",
+                gap: "0.25rem",
+                color: "#475569",
+                fontSize: "0.85rem"
+              }}
+            >
+              {primaryConstraints.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+              {remainingConstraints > 0 && <li>+ {remainingConstraints} further controls</li>}
+            </ul>
+          </div>
+        )}
+        <div style={{ flex: "1 1 240px", minWidth: "220px" }}>
+          <strong
+            style={{
+              display: "block",
+              marginBottom: "0.35rem",
+              color: "#0f172a",
+              fontSize: "0.9rem"
+            }}
+          >
+            Envelope notes
+          </strong>
+          <p style={{ margin: 0, color: "#475569", lineHeight: 1.4 }}>{option.envelopeHint}</p>
+        </div>
+      </div>
+      {option.fsrHeightBonuses && option.fsrHeightBonuses.length > 0 && (
+        <div style={{ padding: "0 1.25rem 1.25rem" }}>
+          <h5 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Floor Space Ratio (FSR) & height bonuses</h5>
+          <div style={{ overflowX: "auto" }}>
+            <table
+              style={{ width: "100%", borderCollapse: "collapse", minWidth: "420px" }}
+            >
+              <thead>
+                <tr>
+                  {['Bonus', 'Floor Space Ratio (FSR)', 'Height', 'Trigger'].map((heading) => (
+                    <th
+                      key={heading}
+                      style={{
+                        textAlign: "left",
+                        padding: "0.6rem",
+                        fontSize: "0.8rem",
+                        backgroundColor: "#f1f5f9",
+                        color: "#0f172a",
+                        borderBottom: "1px solid #cbd5f5"
+                      }}
+                    >
+                      {heading}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {option.fsrHeightBonuses.map((bonus) => (
+                  <tr key={`${bonus.label}-${bonus.fsr}-${bonus.height}`}>
+                    <td
+                      style={{
+                        padding: "0.6rem",
+                        borderTop: "1px solid #dfe3f0",
+                        color: "#1e293b",
+                        fontWeight: 600
+                      }}
+                    >
+                      {bonus.source ? (
+                        <a
+                          href={bonus.source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "#1d4ed8" }}
+                        >
+                          {bonus.label}
+                        </a>
+                      ) : (
+                        bonus.label
+                      )}
+                    </td>
+                    <td
+                      style={{
+                        padding: "0.6rem",
+                        borderTop: "1px solid #dfe3f0",
+                        color: "#334155"
+                      }}
+                    >
+                      {bonus.fsr}
+                    </td>
+                    <td
+                      style={{
+                        padding: "0.6rem",
+                        borderTop: "1px solid #dfe3f0",
+                        color: "#334155"
+                      }}
+                    >
+                      {bonus.height}
+                    </td>
+                    <td
+                      style={{
+                        padding: "0.6rem",
+                        borderTop: "1px solid #dfe3f0",
+                        color: "#475569"
+                      }}
+                    >
+                      {bonus.trigger}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {option.notes && option.notes.length > 0 && (
+        <div style={{ padding: "0 1.25rem 1.25rem" }}>
+          <h5 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Notes</h5>
+          <ul style={{ margin: 0, paddingLeft: "1.1rem", color: "#475569", fontSize: "0.85rem" }}>
+            {option.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div style={{ padding: "0 1.25rem 1.25rem" }}>
+        <SourceList heading="Clauses & references" items={option.clauses} />
+      </div>
+    </article>
+  );
+}
+
+type SourceListProps = {
+  heading: string;
+  items: PlanningSource[];
+};
+
+function SourceList({ heading, items }: SourceListProps) {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div>
+      <h4 style={{ margin: "1rem 0 0.5rem", color: "#1f2937" }}>{heading}</h4>
+      <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "#1d4ed8" }}>
+        {items.map((source) => (
+          <li key={source.url}>
+            <a href={source.url} target="_blank" rel="noopener noreferrer">
+              {source.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+type StatusBadgeProps = {
+  label: string;
+  status?: PlanningOption['status'];
+  fallbackPermitted?: boolean;
+};
+
+function StatusBadge({ label, status, fallbackPermitted }: StatusBadgeProps) {
+  const tone = status ?? (fallbackPermitted ? "permitted" : "conditional");
+  const palette =
+    tone === "permitted"
+      ? { bg: "#dcfce7", fg: "#166534" }
+      : tone === "conditional"
+      ? { bg: "#fef9c3", fg: "#92400e" }
+      : { bg: "#fee2e2", fg: "#b91c1c" };
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "0.35rem 0.75rem",
+        borderRadius: "999px",
+        backgroundColor: palette.bg,
+        color: palette.fg,
+        fontSize: "0.8rem",
+        fontWeight: 600
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function siteSummaryEntries(site: PlanningResult['site']) {
+  const entries = [
+    { label: "Address", value: site.address },
+    { label: "Lot and Plan", value: site.lotPlan },
+    { label: "Local Government Area", value: site.localGovernmentArea }
+  ];
+
+  if (
+    site.latitude !== undefined &&
+    site.longitude !== undefined &&
+    Number.isFinite(site.latitude) &&
+    Number.isFinite(site.longitude)
+  ) {
+    entries.push({
+      label: "Coordinates",
+      value: `${site.latitude.toFixed(5)}, ${site.longitude.toFixed(5)}`
+    });
+  }
+
+  const { todArea, acceleratedPrecinct, deferredArea, nearestTownCentre } = site.locationalInsights;
+  if (todArea.isWithin) {
+    entries.push({
+      label: "Transport Oriented Development (TOD)",
+      value: `${todArea.label ?? 'Transport Oriented Development area'} (${todArea.className ?? 'inner band'})`
+    });
+  } else if (acceleratedPrecinct.isWithin) {
+    entries.push({
+      label: "Transport Oriented Development (TOD)",
+      value: `Accelerated precinct ${acceleratedPrecinct.label ?? ''}`
+    });
+  } else if (deferredArea.isWithin) {
+    entries.push({
+      label: "Transport Oriented Development (TOD)",
+      value: "Deferred Transport Oriented Development area"
+    });
+  } else {
+    entries.push({
+      label: "Transport Oriented Development (TOD)",
+      value: "Outside mapped Transport Oriented Development areas"
+    });
+  }
+
+  if (nearestTownCentre) {
+    const distance = Number.isFinite(nearestTownCentre.distanceMeters)
+      ? `~${Math.round(nearestTownCentre.distanceMeters)} m`
+      : "";
+    entries.push({
+      label: "Nearest town centre",
+      value: `${nearestTownCentre.name} (${nearestTownCentre.band ?? 'outside band'}) ${distance}`.trim()
+    });
+  }
+
+  entries.push({
+    label: "Street View coverage",
+    value: site.streetViewAvailable ? "Available" : "Not available"
+  });
+
+  return entries;
+}
+
+
+
+
+
+
+
+
+
