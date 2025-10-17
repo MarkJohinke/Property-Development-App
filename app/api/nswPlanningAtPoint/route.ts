@@ -119,6 +119,17 @@ function normalisePlanLotArea(value: unknown, units?: unknown): number | null {
   return value;
 }
 
+function normaliseArcGisString(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (isFiniteNumber(value)) {
+    return value.toString();
+  }
+  return undefined;
+}
+
 function relativeDifference(a: number, b: number) {
   const denominator = Math.max(Math.abs(a), Math.abs(b), 1);
   return Math.abs(a - b) / denominator;
@@ -812,11 +823,13 @@ async function fetchCadastreLotArea(
       return null;
     }
 
-    const lotNumber =
-      feature.attributes?.lotnumber ?? (feature.attributes as Record<string, unknown>)?.LOTNUMBER;
-    const planLabel =
-      feature.attributes?.planlabel ?? (feature.attributes as Record<string, unknown>)?.PLANLABEL;
-    const lotPlan = lotNumber && planLabel ? `Lot ${lotNumber} ${planLabel}` : planLabel ?? undefined;
+    const lotNumber = normaliseArcGisString(
+      feature.attributes?.lotnumber ?? (feature.attributes as Record<string, unknown>)?.LOTNUMBER
+    );
+    const planLabel = normaliseArcGisString(
+      feature.attributes?.planlabel ?? (feature.attributes as Record<string, unknown>)?.PLANLABEL
+    );
+    const lotPlan = lotNumber && planLabel ? `Lot ${lotNumber} ${planLabel}` : planLabel;
 
     const planLotArea = normalisePlanLotArea(
       feature.attributes?.planlotarea ?? (feature.attributes as Record<string, unknown>)?.PLANLOTAREA,
@@ -1377,10 +1390,12 @@ async function fetchParcelSummary(
       return null;
     }
 
-    const lotNumber = feature.attributes?.LOTNUMBER;
-    const planLabel = feature.attributes?.PLANLABEL ?? feature.attributes?.LOT_DP;
+    const lotNumber = normaliseArcGisString(feature.attributes?.LOTNUMBER);
+    const planLabel = normaliseArcGisString(
+      feature.attributes?.PLANLABEL ?? feature.attributes?.LOT_DP
+    );
     const planLotArea = normalisePlanLotArea(feature.attributes?.PLANLOTAREA);
-    const lotPlan = lotNumber && planLabel ? `Lot ${lotNumber} ${planLabel}` : planLabel ?? undefined;
+    const lotPlan = lotNumber && planLabel ? `Lot ${lotNumber} ${planLabel}` : planLabel;
     const classSubtypeRaw = feature.attributes?.CLASSSUBTYPE;
     const lotClassSubtype =
       typeof classSubtypeRaw === 'number' && Number.isFinite(classSubtypeRaw)
