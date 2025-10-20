@@ -262,9 +262,13 @@ const formatLandAreaSource = (source: ComparableLandAreaSource) => {
       ? `${numberFormatter.format(source.value)} m²`
       : "N/A";
   const methodLabel = source.method ? ` (${source.method})` : "";
-  const notesLabel = source.notes ? ` – ${source.notes}` : "";
-  return `${source.source}: ${valueLabel}${methodLabel}${notesLabel}`;
+  const metadata = LAND_AREA_SOURCE_METADATA[source.source];
+  const reliabilityLabel = metadata?.reliability ? ` [${metadata.reliability}]` : "";
+  const combinedNotes = [source.notes, metadata?.note].filter(Boolean).join(" — ");
+  const notesLabel = combinedNotes ? ` — ${combinedNotes}` : "";
+  return `${source.source}${reliabilityLabel}: ${valueLabel}${methodLabel}${notesLabel}`;
 };
+
 
 const interpretMapsLoaderError = (error: unknown): string => {
   const rawMessage =
@@ -299,6 +303,20 @@ const interpretMapsLoaderError = (error: unknown): string => {
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 const BODY_FONT_SIZE = "0.95rem";
 const TABLE_FONT_SIZE = "0.9rem";
+const LAND_AREA_SOURCE_METADATA: Record<string, { reliability: string; note?: string }> = {
+  "SIX Maps NSW Cadastre (current parcels)": {
+    reliability: "Authoritative",
+    note: "True cadastral lot layer (Torrens title). Updated daily from NSW LRS."
+  },
+  "Planning Portal – Cadastre Layer": {
+    reliability: "High",
+    note: "Mirrors SIX Maps; preferred inside Planning Portal workflows."
+  },
+  "SEED NSW – Property Lot Boundaries": {
+    reliability: "High",
+    note: "Independent QA feed; updated less frequently but still reliable."
+  }
+};
 
 const glossaryEntries: Array<{ term: string; definition: string; url?: string }> = [
   {
@@ -2703,6 +2721,3 @@ function siteSummaryEntries(site: PlanningResult['site']) {
 
   return entries;
 }
-
-
-

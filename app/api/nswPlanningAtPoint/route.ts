@@ -1006,7 +1006,7 @@ async function enrichComparableSalesLandArea(
 
       if (isFiniteNumber(sale.landAreaSquareMeters)) {
         candidates.push({
-          source: 'Seed dataset',
+          source: 'SEED NSW – Property Lot Boundaries',
           value: sale.landAreaSquareMeters,
           method: 'manual',
           notes: 'Pre-populated comparable record'
@@ -1023,13 +1023,13 @@ async function enrichComparableSalesLandArea(
         const parcelSummary = await fetchParcelSummary(sale.latitude, sale.longitude);
         if (parcelSummary) {
           candidates.push({
-            source: 'NSW LotSearch geometry',
+            source: 'Planning Portal – Cadastre Layer',
             value: parcelSummary.geometryAreaSquareMeters,
             method: 'geometry',
             notes: parcelSummary.lotPlan
           });
           candidates.push({
-            source: 'NSW LotSearch PLANLOTAREA',
+            source: 'Planning Portal – Cadastre Layer',
             value: parcelSummary.planLotAreaSquareMeters,
             method: 'attribute',
             notes: parcelSummary.lotPlan
@@ -1039,13 +1039,13 @@ async function enrichComparableSalesLandArea(
         const cadastreSummary = await fetchCadastreLotArea(sale.latitude, sale.longitude);
         if (cadastreSummary) {
           candidates.push({
-            source: 'NSW Cadastre geometry',
+            source: 'SIX Maps NSW Cadastre (current parcels)',
             value: cadastreSummary.geometryAreaSquareMeters,
             method: 'geometry',
             notes: cadastreSummary.lotPlan
           });
           candidates.push({
-            source: 'NSW Cadastre planlotarea',
+            source: 'SIX Maps NSW Cadastre (current parcels)',
             value: cadastreSummary.planLotAreaSquareMeters,
             method: 'attribute',
             notes: cadastreSummary.lotPlan
