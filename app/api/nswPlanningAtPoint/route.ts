@@ -1557,7 +1557,17 @@ export async function GET(request: Request) {
     );
 
     const zoningInfo = await fetchLandZoning(parcelLatitude, parcelLongitude);
-    const legacyPlan = resolveLegacyPlan(address);
+    let legacyPlan = resolveLegacyPlan(address);
+    if (zoningInfo?.epiName) {
+      const epiName = zoningInfo.epiName.toLowerCase();
+      if (epiName.includes('manly')) {
+        legacyPlan = LEGACY_PLANS.manly;
+      } else if (epiName.includes('pittwater')) {
+        legacyPlan = LEGACY_PLANS.pittwater;
+      } else if (epiName.includes('warringah')) {
+        legacyPlan = LEGACY_PLANS.warringah;
+      }
+    }
     const lepUrl = (fragment?: string) => `${legacyPlan.lepBaseUrl}${fragment ?? ''}`;
     const zoneDisplayName = zoningInfo?.label
       ? zoningInfo.className
@@ -1573,27 +1583,12 @@ export async function GET(request: Request) {
       linkUrl: string;
     }> = [];
     const geometryFallback = 'N/A (insufficient parcel geometry)';
-
-    if (parcelSummary) {
-      const frontageValue =
-        parcelSummary.streetFrontageMeters ?? parcelSummary.frontageMeters ?? null;
-      metrics.push(
-        {
-          id: 'street-frontage',
-          label: 'Approx. Street Frontage',
-          value: formatMeters(frontageValue, geometryFallback),
-          linkLabel: 'NSW LotSearch (Common/LotSearch)',
-          linkUrl: LOT_SEARCH_DATASHEET
-        },
-        {
-          id: 'parcel-depth',
-          label: 'Approx. Parcel Depth',
-          value: formatMeters(parcelSummary.depthMeters, geometryFallback),
-          linkLabel: 'NSW LotSearch (Common/LotSearch)',
-          linkUrl: LOT_SEARCH_DATASHEET
-        }
-      );
-    }
+    const frontageValue =
+      parcelSummary?.streetFrontageMeters ?? parcelSummary?.frontageMeters ?? null;
+    const depthValue = parcelSummary?.depthMeters ?? null;
+    const rearBoundaryValue = parcelSummary?.rearBoundaryMeters ?? null;
+    const leftBoundaryValue = parcelSummary?.leftBoundaryMeters ?? null;
+    const rightBoundaryValue = parcelSummary?.rightBoundaryMeters ?? null;
 
     metrics.push(
       {
@@ -1627,8 +1622,6 @@ export async function GET(request: Request) {
     );
 
     if (parcelSummary) {
-      const frontageValue =
-        parcelSummary.streetFrontageMeters ?? parcelSummary.frontageMeters ?? null;
       metrics.push(
         {
           id: 'street-frontage',
@@ -1640,28 +1633,28 @@ export async function GET(request: Request) {
         {
           id: 'parcel-depth',
           label: 'Approx. Parcel Depth',
-          value: formatMeters(parcelSummary.depthMeters, geometryFallback),
+          value: formatMeters(depthValue, geometryFallback),
           linkLabel: 'NSW LotSearch (Common/LotSearch)',
           linkUrl: LOT_SEARCH_DATASHEET
         },
         {
           id: 'rear-width',
           label: 'Approx. Rear Boundary Width',
-          value: formatMeters(parcelSummary.rearBoundaryMeters, geometryFallback),
+          value: formatMeters(rearBoundaryValue, geometryFallback),
           linkLabel: 'NSW LotSearch (Common/LotSearch)',
           linkUrl: LOT_SEARCH_DATASHEET
         },
         {
           id: 'left-boundary',
           label: 'Approx. Left Boundary Length',
-          value: formatMeters(parcelSummary.leftBoundaryMeters, geometryFallback),
+          value: formatMeters(leftBoundaryValue, geometryFallback),
           linkLabel: 'NSW LotSearch (Common/LotSearch)',
           linkUrl: LOT_SEARCH_DATASHEET
         },
         {
           id: 'right-boundary',
           label: 'Approx. Right Boundary Length',
-          value: formatMeters(parcelSummary.rightBoundaryMeters, geometryFallback),
+          value: formatMeters(rightBoundaryValue, geometryFallback),
           linkLabel: 'NSW LotSearch (Common/LotSearch)',
           linkUrl: LOT_SEARCH_DATASHEET
         }
@@ -1702,6 +1695,11 @@ export async function GET(request: Request) {
         source: {
           label: 'Codes SEPP Part 3A - Dual Occupancies',
           url: CODES_SEPP_PART3A_URL
+        },
+        requirements: {
+          front: 6,
+          side: 0.9,
+          rear: 3
         }
       },
       cdcTerrace: {
@@ -1710,6 +1708,11 @@ export async function GET(request: Request) {
         source: {
           label: 'Codes SEPP Part 3B - Low Rise Housing',
           url: CODES_SEPP_PART3B_URL
+        },
+        requirements: {
+          front: 4.5,
+          side: 0.9,
+          rear: 6
         }
       },
       daDuplex: {
@@ -1718,6 +1721,11 @@ export async function GET(request: Request) {
         source: {
           label: `${legacyPlan.dcpName} - Dual Occupancy Controls`,
           url: legacyPlan.dcpUrl
+        },
+        requirements: {
+          front: 6,
+          side: 1.2,
+          rear: 6
         }
       },
       daTerrace: {
@@ -1726,6 +1734,11 @@ export async function GET(request: Request) {
         source: {
           label: `${legacyPlan.dcpName} - Terrace Housing Controls`,
           url: legacyPlan.dcpUrl
+        },
+        requirements: {
+          front: 5,
+          side: 1.2,
+          rear: 6
         }
       }
     };
@@ -2674,6 +2687,12 @@ export async function GET(request: Request) {
           latitude: streetViewLatitude,
           longitude: streetViewLongitude
         },
+        streetFrontageMeters: frontageValue,
+        depthMeters: depthValue,
+        rearBoundaryMeters: rearBoundaryValue,
+        leftBoundaryMeters: leftBoundaryValue,
+        rightBoundaryMeters: rightBoundaryValue,
+        lotType: parcelSummary?.lotType ?? null,
         generatedAt,
         metrics,
         dataSources,

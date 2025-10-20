@@ -53,6 +53,11 @@ type PlanningOptionCategory = "lmr" | "hda" | "cdc" | "da";
 type SetbackSummary = {
   summary: string;
   source: PlanningSource;
+  requirements?: {
+    front?: number;
+    rear?: number;
+    side?: number;
+  };
 };
 
 type PlanningOption = {
@@ -186,6 +191,12 @@ type PlanningResult = {
       latitude?: number;
       longitude?: number;
     };
+    streetFrontageMeters?: number | null;
+    depthMeters?: number | null;
+    rearBoundaryMeters?: number | null;
+    leftBoundaryMeters?: number | null;
+    rightBoundaryMeters?: number | null;
+    lotType?: string | null;
     metrics: SiteMetric[];
     dataSources: PlanningSource[];
     guidelineLinks: PlanningSource[];
@@ -994,7 +1005,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
               </div>
               <div style={{ display: "grid", gap: "1rem" }}>
                 {column.options.map((option) => (
-                  <PlanningOptionCard key={option.slug} option={option} />
+                  <PlanningOptionCard key={option.slug} option={option} site={site} />
                 ))}
               </div>
             </div>
@@ -2161,13 +2172,36 @@ function PlanningOptionSummaryTable({ options }: PlanningOptionSummaryTableProps
 }
 type PlanningOptionCardProps = {
   option: PlanningOption;
+  site: PlanningResult['site'];
 };
 
-function PlanningOptionCard({ option }: PlanningOptionCardProps) {
+function PlanningOptionCard({ option, site }: PlanningOptionCardProps) {
   const primaryConstraints = option.constraints.slice(0, 2);
   const remainingConstraints = option.constraints.length - primaryConstraints.length;
   const setbacksSource = option.setbacks?.source;
   const showDetailedSections = option.isPermitted;
+
+  const frontage = site.streetFrontageMeters ?? null;
+  const lotDepth = site.depthMeters ?? null;
+  const frontSetback = option.setbacks?.requirements?.front ?? null;
+  const rearSetback = option.setbacks?.requirements?.rear ?? frontSetback ?? null;
+  const sideSetback = option.setbacks?.requirements?.side ?? null;
+
+  const buildableWidth =
+    frontage !== null && sideSetback !== null
+      ? Math.max(frontage - 2 * sideSetback, 0)
+      : null;
+  const buildableDepth =
+    lotDepth !== null
+      ? Math.max(lotDepth - (frontSetback ?? 0) - (rearSetback ?? frontSetback ?? 0), 0)
+      : null;
+
+  const formatDimension = (value: number | null) =>
+    value !== null && Number.isFinite(value) ? `${value.toFixed(1)} m` : null;
+  const footprintLabels = [
+    buildableWidth !== null ? `Width approx. ${formatDimension(buildableWidth)}` : null,
+    buildableDepth !== null ? `Depth approx. ${formatDimension(buildableDepth)}` : null
+  ].filter((value): value is string => Boolean(value));
 
   const parseFirstNumber = (input?: string) => {
     if (!input) return null;
@@ -2353,6 +2387,26 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                 </span>
               )
             )}
+          </section>
+        )}
+        {showDetailedSections && footprintLabels.length > 0 && (
+          <section>
+            <strong
+              style={{
+                display: "block",
+                marginBottom: "0.35rem",
+                color: "#0f172a",
+                fontSize: BODY_FONT_SIZE
+              }}
+            >
+              Indicative buildable footprint
+            </strong>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.4, fontSize: BODY_FONT_SIZE }}>
+              {footprintLabels.join(" | ")}
+            </p>
+            <p style={{ margin: "0.2rem 0 0", color: "#94a3b8", fontSize: "0.8rem" }}>
+              Approximation only - excludes articulation zones, easements, and frontage/town centre variations.
+            </p>
           </section>
         )}
         {showDetailedSections && (
