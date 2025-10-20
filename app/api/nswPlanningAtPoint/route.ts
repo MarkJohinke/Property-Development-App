@@ -1884,7 +1884,7 @@ export async function GET(request: Request) {
       {
         slug: 'lmr-tod',
         title: 'Low and Mid-Rise (LMR) - Transport Oriented Development (TOD)',
-        category: 'lmr',
+        category: 'hda',
         status: isLmrBand ? 'permitted' : 'prohibited',
         permissibility:
           todBand === 'N/A'
@@ -1931,6 +1931,7 @@ export async function GET(request: Request) {
           lmrContextSummary,
           `Town centre context: ${townCentreBand === 'N/A' ? 'outside mapped bands' : `${townCentreBand} band for ${townCentreName}`}.`,
           'Coordinate Transport Oriented Development (TOD) program engagement early to confirm staging windows and parking rate variations.',
+          'Reference Section 3 Development Application (DA) pathways for detailed merit lodgement requirements once the Housing Diversity concept progresses.',
           ...(todNonDiscretionaryNote ? [todNonDiscretionaryNote] : [])
         ],
         clauses: [
@@ -1989,6 +1990,7 @@ export async function GET(request: Request) {
         notes: [
           'Engage NSW Land and Housing Corporation or Community Housing Providers early to secure tenure commitments.',
           'Leverage state or federal financing instruments (HAFF, NHFIC) to maintain affordability.',
+          'Coordinate with Section 3 Development Application (DA) pathways (apartments) to stage documentation for 100% affordable schemes.',
           ...(todNonDiscretionaryNote ? [todNonDiscretionaryNote] : []),
           ...(townCentreNonDiscretionaryNote ? [townCentreNonDiscretionaryNote] : []),
           lmrImprovementSummary
@@ -2005,63 +2007,88 @@ export async function GET(request: Request) {
         ]
       },
       {
-        slug: 'lmr-town-centre',
-        title: 'Low and Mid-Rise (LMR) - Town Centre',
-        category: 'lmr',
-        status: isLmrBand ? 'permitted' : townCentreBand !== 'N/A' ? 'conditional' : 'prohibited',
+        slug: 'lmr-townhouse',
+        title: 'Low and Mid-Rise (LMR) - Townhouse',
+        category: 'hda',
+        status:
+          frontage21mSatisfied && (isLmrBand || townCentreBand !== 'N/A')
+            ? 'permitted'
+            : frontage21mSatisfied
+              ? 'conditional'
+              : 'prohibited',
         permissibility:
-          townCentreBand === 'N/A'
-            ? 'Outside Housing SEPP town centre bands'
-            : `Housing SEPP town centre ${townCentreBand.toLowerCase()} band (${townCentreName})`,
-        isPermitted: townCentreBand !== 'N/A',
+          !frontage21mSatisfied
+            ? 'Frontage <21 m triggers amalgamation before Low and Mid-Rise townhouse uplift can proceed.'
+            : isLmrBand
+              ? `Housing SEPP Transport Oriented Development (TOD) ${todBand.toLowerCase()} band townhouse typology`
+              : townCentreBand !== 'N/A'
+                ? `Housing SEPP town centre ${townCentreBand.toLowerCase()} band townhouse typology`
+                : 'Outside mapped Low and Mid-Rise uplift areas - rely on Development Application (DA) merit pathway.',
+        isPermitted: frontage21mSatisfied && (isLmrBand || townCentreBand !== 'N/A'),
         rationale:
-          townCentreBand === 'N/A'
-            ? 'Town centre uplift not yet mapped - requires rezoning or Transport Oriented Development (TOD) program inclusion.'
-            : 'Town centre mapping permits Low and Mid-Rise (LMR) testing with ADG compliance, frontage, and public domain upgrades.',
+          frontage21mSatisfied && (isLmrBand || townCentreBand !== 'N/A')
+            ? 'Housing SEPP Low and Mid-Rise provisions support three-to-four storey townhouse formats when frontage >=21 m and ADG townhouse benchmarks are achieved.'
+            : 'Secure frontage amalgamation or await Housing Diversity mapping updates before relying on Low and Mid-Rise townhouse uplift.',
         zoneCompatibility:
-          townCentreBand !== 'N/A'
-            ? `Requires >=21 m frontage, active ground plane, and ADG compliance to support ${townCentreBand.toLowerCase()} band uplift for ${townCentreName}.`
-            : 'Outside mapped town centre - merit Development Application (DA) or planning proposal required.',
+          frontage21mSatisfied && (isLmrBand || townCentreBand !== 'N/A')
+            ? 'Aligns with Transport Oriented Development (TOD)/town centre multi dwelling expectations subject to active transport and deep soil upgrades.'
+            : 'Fallback to Section 3 Development Application (DA) pathways if Housing Diversity triggers are unavailable.',
         governingFactors: [
-          { label: 'Town centre', value: townCentreName, source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
-          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
-          { label: 'Frontage', value: '>=21 m (Housing SEPP town centre baseline)', source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
-          { label: 'Height baseline', value: '13 m (4 storeys) with design excellence uplift', source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
-          { label: 'Floor Space Ratio (FSR) baseline', value: '1.0:1 (subject to ADG compliance)', source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
+          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
+          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
+          { label: 'Height baseline', value: '13 m (4 storeys) townhouse envelope', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Floor Space Ratio (FSR) baseline', value: '1.0:1 townhouse uplift target', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Depth', value: depthApprox },
+          { label: 'Minimum lot size', value: areaApprox, source: { label: `${legacyPlan.lepName} - Lot Size Map`, url: lepUrl(legacyPlan.lotSizeSchedule) } }
         ],
-        setbacks: setbacks.apartment,
+        setbacks: setbacks.daTerrace,
         constraints: [
-          'Provide town centre design response with active frontage and public domain upgrades.',
-          'Address ADG performance for solar access, apartment mix, deep soil, and car parking.',
-          'Coordinate traffic, flood, and infrastructure evidence with Northern Beaches Council and NSW Planning.'
+          'Confirm >=21 m continuous frontage via survey; consolidate titles if truncations reduce width.',
+          'Demonstrate Apartment Design Guide townhouse compliance (Part 3D) including deep soil, privacy, and cross ventilation outcomes.',
+          'Coordinate public domain, active transport, and utility upgrades to align with Transport Oriented Development (TOD) and Housing Diversity expectations.'
         ],
         envelopeHint:
-          'Mixed-use podium with upper level apartments responding to town centre setbacks and pedestrian realm upgrades.',
+          'Three storey townhouse row with landscaped setbacks, communal deep soil, and activated frontage transitioning to the surrounding low-rise neighbourhood.',
         fsrHeightBonuses: [
           {
-            label: 'Design excellence bonus',
-            fsr: 'Up to 1.15:1',
-            height: '15 m',
-            trigger: 'Achieve design excellence endorsement and town centre place-making outcomes.'
+            label: 'Design excellence townhouse bonus',
+            fsr: 'Up to 1.05:1',
+            height: '13 m',
+            trigger: 'Secure design excellence endorsement and demonstrate superior neighbourhood transition.'
+          },
+          {
+            label: 'Infill affordable housing bonus',
+            fsr: 'Up to 1.1:1',
+            height: '14 m',
+            trigger: 'Deliver >=15% infill affordable townhouses managed by a registered community housing provider.'
           }
         ],
         notes: [
-          `Engage town centre place planning teams to align uplift with ${townCentreName} structure planning.`,
-          'Active transport integration and reduced parking ratios may be supported with mode shift evidence.',
-          'Layer Transport Oriented Development (TOD) engagement if Transport Oriented Development (TOD) mapping activates in addition to the town centre band.',
+          `Housing Diversity focus: ${
+            isLmrBand
+              ? `${todBand} Transport Oriented Development (TOD) band`
+              : townCentreBand !== 'N/A'
+                ? `${townCentreBand} town centre band for ${townCentreName}`
+                : 'awaiting mapping activation'
+          }.`,
+          'Link to Section 3 Development Application (DA) - Terraces for merit fallback or staged lodgement.',
+          'Maintain engagement with NSW Planning Housing Diversity program to confirm timing and delivery obligations.',
           ...(townCentreNonDiscretionaryNote ? [townCentreNonDiscretionaryNote] : []),
           lmrImprovementSummary
         ],
         clauses: [
           {
-            label: 'Housing SEPP 2021 - Town Centre Housing',
-            url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643'
+            label: 'Housing SEPP 2021 - Low and Mid-Rise Housing',
+            url: HOUSING_SEPP_LMR_URL
           },
           {
             label: 'Apartment Design Guide (2023)',
-            url: 'https://www.planning.nsw.gov.au/sites/default/files/2023-03/apartment-design-guide.pdf'
+            url: APARTMENT_DESIGN_GUIDE_URL
+          },
+          {
+            label: `${legacyPlan.dcpName} - Multi Dwelling Housing`,
+            url: legacyPlan.dcpUrl
           }
         ]
       },
@@ -2276,6 +2303,7 @@ export async function GET(request: Request) {
           }
         ],
         notes: [
+          'Reference Section 2 Housing Diversity pathways (TOD, 100% affordable, townhouse) to align uplift obligations prior to DA lodgement.',
           'Consider site amalgamation if frontage <21 m to de-risk refusal.',
           'Active transport and parking variations easier to justify inside Transport Oriented Development (TOD)/town centre bands.',
           'Conduct design review or pre-lodgement to validate terrace layout with council.',
@@ -2364,6 +2392,7 @@ export async function GET(request: Request) {
         setbacks: setbacks.apartment,
         constraints: [
           'Apartment Design Guide compliance across solar access, cross ventilation, deep soil, communal areas, and parking.',
+          'Maintain >=15% infill affordable dwellings to unlock Housing SEPP incentives outlined in Section 2 pathways.',
           'Design excellence process required for uplift; consider NSW Design Review Panel engagement.',
           'Coordinate infrastructure and public benefit (Voluntary Planning Agreement (VPA)) offers in line with Transport Oriented Development (TOD) or town centre expectations.'
         ],
@@ -2386,6 +2415,7 @@ export async function GET(request: Request) {
         notes: [
           'State Significant Development (SSD) pathway becomes viable where capital investment exceeds $75m or >100 dwellings are proposed.',
           'Test Housing Diversity Amendment (HDA) scenarios for additional uplift and design flexibility once mapping commences.',
+          'Reference Section 2 Housing Diversity pathways (TOD, 100% affordable, townhouse) to ensure DA documentation aligns with uplift obligations.',
           'Undertake early utilities and transport engagement to evidence capacity upgrades.',
           ...(todNonDiscretionaryNote ? [todNonDiscretionaryNote] : []),
           ...(townCentreNonDiscretionaryNote ? [townCentreNonDiscretionaryNote] : []),
