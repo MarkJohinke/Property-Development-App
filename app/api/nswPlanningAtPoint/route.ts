@@ -1627,7 +1627,23 @@ export async function GET(request: Request) {
     );
 
     if (parcelSummary) {
+      const frontageValue =
+        parcelSummary.streetFrontageMeters ?? parcelSummary.frontageMeters ?? null;
       metrics.push(
+        {
+          id: 'street-frontage',
+          label: 'Approx. Street Frontage',
+          value: formatMeters(frontageValue, geometryFallback),
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        },
+        {
+          id: 'parcel-depth',
+          label: 'Approx. Parcel Depth',
+          value: formatMeters(parcelSummary.depthMeters, geometryFallback),
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        },
         {
           id: 'rear-width',
           label: 'Approx. Rear Boundary Width',
