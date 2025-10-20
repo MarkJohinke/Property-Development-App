@@ -2522,7 +2522,7 @@ export async function GET(request: Request) {
 
     const generatedAt = new Date().toISOString();
 
-    const developmentApplicationSeeds: Array<DevelopmentActivity & { tags: string[] }> = [
+    const developmentApplicationSeeds = [
       {
         applicationNumber: 'DA2025/0455',
         address: '12 Quirk Road, Dee Why NSW 2099',
@@ -2613,7 +2613,7 @@ export async function GET(request: Request) {
         (a, b) =>
           new Date(b.decisionDate).getTime() - new Date(a.decisionDate).getTime()
       )
-      .map(({ tags, ...rest }) => rest);
+      .map(({ tags: _tags, ...rest }) => rest);
 
     const recommendationSummary = {
       headline:
