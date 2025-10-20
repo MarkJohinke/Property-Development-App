@@ -650,6 +650,10 @@ export default function AddressSearch() {
   };
 
   const handleSearch = async () => {
+    if (loading) {
+      return;
+    }
+
     if (!address.trim()) {
       setError("Please enter an address to continue.");
       return;
@@ -683,7 +687,13 @@ export default function AddressSearch() {
 
   return (
     <div style={{ marginTop: "2rem", display: "grid", gap: "1.5rem" }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void handleSearch();
+        }}
+        style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}
+      >
         <input
           ref={inputRef}
           type="text"
@@ -699,10 +709,10 @@ export default function AddressSearch() {
           autoComplete="off"
           aria-label="Enter a property address in New South Wales"
         />
-        <button onClick={handleSearch} disabled={loading}>
+        <button type="submit" disabled={loading}>
           {loading ? "Analysing…" : "Analyse Site"}
         </button>
-      </div>
+      </form>
 
       {!mapsReady && (
         <datalist id="address-suggestions">
