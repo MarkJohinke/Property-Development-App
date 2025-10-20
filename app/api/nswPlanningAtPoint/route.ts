@@ -54,6 +54,8 @@ const HOUSING_SEPP_TOWN_CENTRE_URL = 'https://legislation.nsw.gov.au/view/html/i
 const CODES_SEPP_PART3A_URL = 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572#pt.3A';
 const CODES_SEPP_PART3B_URL = 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572#pt.3B';
 const HOUSING_DIVERSITY_PROGRAM_URL = 'https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy';
+const APARTMENT_DESIGN_GUIDE_URL =
+  'https://www.planning.nsw.gov.au/sites/default/files/2023-03/apartment-design-guide.pdf';
 
 type LandZoningAttributes = {
   LABEL?: string;
@@ -1563,7 +1565,37 @@ export async function GET(request: Request) {
         : zoningInfo.label
       : 'Low Density Residential (R2)';
 
-    const metrics = [
+    const metrics: Array<{
+      id: string;
+      label: string;
+      value: string;
+      linkLabel: string;
+      linkUrl: string;
+    }> = [];
+    const geometryFallback = 'N/A (insufficient parcel geometry)';
+
+    if (parcelSummary) {
+      const frontageValue =
+        parcelSummary.streetFrontageMeters ?? parcelSummary.frontageMeters ?? null;
+      metrics.push(
+        {
+          id: 'street-frontage',
+          label: 'Approx. Street Frontage',
+          value: formatMeters(frontageValue, geometryFallback),
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        },
+        {
+          id: 'parcel-depth',
+          label: 'Approx. Parcel Depth',
+          value: formatMeters(parcelSummary.depthMeters, geometryFallback),
+          linkLabel: 'NSW LotSearch (Common/LotSearch)',
+          linkUrl: LOT_SEARCH_DATASHEET
+        }
+      );
+    }
+
+    metrics.push(
       {
         id: 'zoning',
         label: 'Zone',
@@ -1591,35 +1623,11 @@ export async function GET(request: Request) {
         value: '600 square metres',
         linkLabel: `${legacyPlan.lepName} - Lot Size Map`,
         linkUrl: lepUrl(legacyPlan.lotSizeSchedule)
-      },
-      {
-        id: 'setbacks',
-        label: 'Indicative Residential Setbacks',
-        value: 'Front 6 m / Side 0.9 m / Rear 3 m',
-        linkLabel: 'Codes SEPP Part 3A - Dual Occupancies',
-        linkUrl: CODES_SEPP_PART3A_URL
       }
-    ];
+    );
 
     if (parcelSummary) {
-      const geometryFallback = 'N/A (insufficient parcel geometry)';
-      const frontageValue =
-        parcelSummary.streetFrontageMeters ?? parcelSummary.frontageMeters ?? null;
       metrics.push(
-        {
-          id: 'street-frontage',
-          label: 'Approx. Street Frontage',
-          value: formatMeters(frontageValue, geometryFallback),
-          linkLabel: 'NSW LotSearch (Common/LotSearch)',
-          linkUrl: LOT_SEARCH_DATASHEET
-        },
-        {
-          id: 'parcel-depth',
-          label: 'Approx. Parcel Depth',
-          value: formatMeters(parcelSummary.depthMeters, geometryFallback),
-          linkLabel: 'NSW LotSearch (Common/LotSearch)',
-          linkUrl: LOT_SEARCH_DATASHEET
-        },
         {
           id: 'rear-width',
           label: 'Approx. Rear Boundary Width',
@@ -1662,6 +1670,49 @@ export async function GET(request: Request) {
         });
       }
     }
+
+    const setbacks = {
+      apartment: {
+        summary:
+          'Front setbacks coordinate with street wall controls; apply Apartment Design Guide Table 6D.2 for 4-6 storey separation (6 m non-habitable / 9 m habitable).',
+        source: {
+          label: 'Apartment Design Guide (2023) - Table 6D.2',
+          url: APARTMENT_DESIGN_GUIDE_URL
+        }
+      },
+      cdcDuplex: {
+        summary:
+          'Front 6 m landscaped setback with side 0.9 m and rear 3 m private open space (Codes SEPP Part 3A baseline).',
+        source: {
+          label: 'Codes SEPP Part 3A - Dual Occupancies',
+          url: CODES_SEPP_PART3A_URL
+        }
+      },
+      cdcTerrace: {
+        summary:
+          'Front 4.5 m average with side 0.9 m end terrace setback and rear 6 m private open space (Codes SEPP Part 3B baseline).',
+        source: {
+          label: 'Codes SEPP Part 3B - Low Rise Housing',
+          url: CODES_SEPP_PART3B_URL
+        }
+      },
+      daDuplex: {
+        summary:
+          'Front 6 m landscaped setback with side 1.2 m minimum and rear 6 m landscaped zone (Council Development Control Plan performance standard).',
+        source: {
+          label: `${legacyPlan.dcpName} - Dual Occupancy Controls`,
+          url: legacyPlan.dcpUrl
+        }
+      },
+      daTerrace: {
+        summary:
+          'Front 4.5-6 m active frontage with side 1.2 m end terrace and rear 6 m private open space (Council Development Control Plan benchmarks).',
+        source: {
+          label: `${legacyPlan.dcpName} - Terrace Housing Controls`,
+          url: legacyPlan.dcpUrl
+        }
+      }
+    };
 
     const dataSources = [
       {
@@ -1825,6 +1876,7 @@ export async function GET(request: Request) {
           { label: 'Height baseline', value: '13 m (4 storeys) prior to bonuses', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'Minimum lot size', value: areaApprox, source: { label: `${legacyPlan.lepName} - Lot Size Map`, url: lepUrl(legacyPlan.lotSizeSchedule) } }
         ],
+        setbacks: setbacks.apartment,
         constraints: [
           'Prepare design excellence and ADG compliance evidence covering solar access, cross ventilation, and deep soil.',
           'Submit an infrastructure servicing strategy aligning with NSW Planning Transport Oriented Development (TOD) delivery milestones.',
@@ -1889,6 +1941,7 @@ export async function GET(request: Request) {
           { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
           { label: 'Design excellence', value: 'Mandatory design review and excellence pathway', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
         ],
+        setbacks: setbacks.apartment,
         constraints: [
           'Registered community housing provider to control the scheme for at least 15 years.',
           'Prepare affordable housing management plan and funding strategy.',
@@ -1949,6 +2002,7 @@ export async function GET(request: Request) {
           { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
         ],
+        setbacks: setbacks.apartment,
         constraints: [
           'Provide town centre design response with active frontage and public domain upgrades.',
           'Address ADG performance for solar access, apartment mix, deep soil, and car parking.',
@@ -2002,6 +2056,7 @@ export async function GET(request: Request) {
           { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
         ],
+        setbacks: setbacks.cdcDuplex,
         constraints: [
           'Provide bushfire, flood, and engineering certificates prior to Complying Development Certificate (CDC) issue.',
           'Demonstrate Building Height Plane compliance and privacy interface under DCP controls.',
@@ -2053,6 +2108,7 @@ export async function GET(request: Request) {
           { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'Depth', value: depthApprox }
         ],
+        setbacks: setbacks.cdcTerrace,
         constraints: [
           'Survey frontage to confirm >=21 m clear of truncations or easements.',
           'Provide party wall acoustic, National Construction Code (NCC) fire separation, and stormwater design for terrace modules.',
@@ -2111,6 +2167,7 @@ export async function GET(request: Request) {
             : { label: 'LMR uplift', value: 'Unavailable (outside LMR mapping)' }),
           { label: 'Frontage', value: frontageApprox, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
         ],
+        setbacks: setbacks.daDuplex,
         constraints: [
           'Clause 4.6 variation required where height or Floor Space Ratio (FSR) exceed mapped controls.',
           'Support with flood, bushfire, traffic, and landscaping evidence to address DCP objectives.',
@@ -2173,6 +2230,7 @@ export async function GET(request: Request) {
               }
             : { label: 'LMR uplift', value: 'Unavailable (outside LMR mapping)' })
         ],
+        setbacks: setbacks.daTerrace,
         constraints: [
           'Provide urban design statement demonstrating compatibility with adjoining low density context.',
           'Address on-site detention, flood, and bushfire resilience for terrace format.',
@@ -2274,6 +2332,7 @@ export async function GET(request: Request) {
             }
           }
         ],
+        setbacks: setbacks.apartment,
         constraints: [
           'Apartment Design Guide compliance across solar access, cross ventilation, deep soil, communal areas, and parking.',
           'Design excellence process required for uplift; consider NSW Design Review Panel engagement.',
@@ -2408,9 +2467,175 @@ export async function GET(request: Request) {
       }
     ];
 
+    const recommendations = [
+      {
+        category: 'Proceedable Pathways',
+        title: 'Progress Complying Development Certificate (CDC) duplex documentation',
+        detail:
+          'Advance the Complying Development Certificate (CDC)-ready duplex scheme with architectural, Building Sustainability Index (BASIX), bushfire and flood reporting so that a complying certificate can be issued immediately after due diligence.',
+        sources: [
+          {
+            label: 'Codes SEPP Part 3A Dual Occupancies',
+            url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572#pt.3A'
+          }
+        ]
+      },
+      {
+        category: 'Risk Flags',
+        title: 'Verify terrace frontage and flood constraints',
+        detail:
+          'Confirm usable frontage >=21 m via survey, then resolve flood and overland flow design to keep terrace Complying Development Certificate (CDC) and Development Application (DA) pathways viable.',
+        sources: [
+          {
+            label: 'NSW LotSearch - Common/LotSearch',
+            url: LOT_SEARCH_DATASHEET
+          }
+        ]
+      },
+      {
+        category: 'Further Investigation',
+        title: 'Test Transport Oriented Development (TOD) / town centre apartment scheme',
+        detail:
+          'Model a 4-6 storey apartment concept aligned with Transport Oriented Development (TOD) design excellence criteria; validate deep soil, parking and infrastructure upgrades with NSW Planning.',
+        sources: [
+          {
+            label: 'Housing SEPP Low and Mid-Rise Housing',
+            url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643'
+          }
+        ]
+      },
+      {
+        category: 'High Risk / Likely Refusal',
+        title: 'Apartments without Transport Oriented Development (TOD) / town centre mapping',
+        detail:
+          'Outside Transport Oriented Development (TOD)/town centre activation apartments face refusal-pursue planning proposal or await Housing SEPP commencement before lodging.',
+        sources: [
+          {
+            label: 'NSW Planning - Transport Oriented Development (TOD) Program',
+            url: 'https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy'
+          }
+        ]
+      }
+    ];
+
     const comparableSales = await enrichComparableSalesLandArea(comparableSaleSeeds);
 
     const generatedAt = new Date().toISOString();
+
+    const developmentApplicationSeeds: Array<DevelopmentActivity & { tags: string[] }> = [
+      {
+        applicationNumber: 'DA2025/0455',
+        address: '12 Quirk Road, Dee Why NSW 2099',
+        description: 'Dual occupancy (attached) with Torrens title subdivision and shared basement parking.',
+        status: 'Approved',
+        decisionDate: '2025-03-12',
+        source: {
+          label: 'Northern Beaches Council Development Application (DA) Tracker',
+          url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
+        },
+        tags: ['duplex', 'cdc']
+      },
+      {
+        applicationNumber: 'DA2024/0988',
+        address: '30 Howard Avenue, Dee Why NSW 2099',
+        description: 'Five storey mixed-use building with ground floor retail and 18 apartments above.',
+        status: 'Approved',
+        decisionDate: '2024-11-30',
+        source: {
+          label: 'NSW Planning Portal - Development Application (DA) Register',
+          url: 'https://www.planningportal.nsw.gov.au/'
+        },
+        tags: ['apartment']
+      },
+      {
+        applicationNumber: 'DA2024/0675',
+        address: '8 Pitt Road, North Curl Curl NSW 2099',
+        description: 'Multi dwelling housing (terraces) comprising three attached dwellings with rooftop landscaping.',
+        status: 'Under assessment',
+        decisionDate: '2024-09-05',
+        source: {
+          label: 'Northern Beaches Council Development Application (DA) Tracker',
+          url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
+        },
+        tags: ['terrace']
+      },
+      {
+        applicationNumber: 'DA2023/1122',
+        address: '5 Victor Road, Dee Why NSW 2099',
+        description: 'Dual occupancy (attached) with Torrens title subdivision.',
+        status: 'Approved',
+        decisionDate: '2023-08-14',
+        source: {
+          label: 'Northern Beaches Council Development Application (DA) Tracker',
+          url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
+        },
+        tags: ['duplex']
+      }
+    ];
+
+    const recommendationTagMatchers = [
+      { pattern: /duplex|dual occupancy/i, tag: 'duplex' },
+      { pattern: /terrace/i, tag: 'terrace' },
+      { pattern: /apartment|transport oriented development|town centre/i, tag: 'apartment' }
+    ];
+    const recommendationTags = new Set<string>();
+    recommendations.forEach((recommendation) => {
+      const text = `${recommendation.title} ${recommendation.detail}`.toLowerCase();
+      recommendationTagMatchers.forEach(({ pattern, tag }) => {
+        if (pattern.test(text)) {
+          recommendationTags.add(tag);
+        }
+      });
+    });
+    if (recommendationTags.size === 0) {
+      ['duplex', 'terrace', 'apartment'].forEach((tag) => recommendationTags.add(tag));
+    }
+
+    const generatedAtDate = new Date(generatedAt);
+    const twelveMonthsAgo = new Date(generatedAtDate);
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    const filteredDevelopmentActivity = developmentApplicationSeeds.filter((application) => {
+      const decisionDate = new Date(application.decisionDate);
+      if (Number.isNaN(decisionDate.getTime()) || decisionDate < twelveMonthsAgo) {
+        return false;
+      }
+      return application.tags.some((tag) => recommendationTags.has(tag));
+    });
+
+    const developmentActivity = (filteredDevelopmentActivity.length > 0
+      ? filteredDevelopmentActivity
+      : developmentApplicationSeeds.filter((application) => {
+          const decisionDate = new Date(application.decisionDate);
+          return !Number.isNaN(decisionDate.getTime()) && decisionDate >= twelveMonthsAgo;
+        }))
+      .sort(
+        (a, b) =>
+          new Date(b.decisionDate).getTime() - new Date(a.decisionDate).getTime()
+      )
+      .map(({ tags, ...rest }) => rest);
+
+    const recommendationSummary = {
+      headline:
+        'Deliver Complying Development Certificate (CDC) duplex immediately while progressing Transport Oriented Development (TOD)/town centre uplift investigations.',
+      status: 'Go (conditional)',
+      rationalePoints: [
+        'Codes SEPP duplex pathway is compliant with frontage, area, and hazard certification.',
+        `Transport Oriented Development (TOD) / town centre mapping offers apartment upside subject to design excellence (${todBand} Transport Oriented Development (TOD) band, ${townCentreBand} town centre band).`,
+        townCentreSummary,
+        'Market evidence supports duplex pricing above $2.3m per dwelling, reinforcing baseline feasibility.'
+      ],
+      nextSteps: [
+        'Finalize Complying Development Certificate (CDC) duplex documentation and secure complying development certificate.',
+        'Engage NSW Planning Transport Oriented Development (TOD) delivery team to clarify frontage, deep soil, and infrastructure expectations.',
+        todNextStep
+      ],
+      risks: [
+        'Flood, overland flow and bushfire certification required to retain Complying Development Certificate (CDC) eligibility.',
+        'Transport Oriented Development (TOD) uplift contingent on Housing SEPP commencement-monitor mapping and policy updates.'
+      ],
+      confidenceRating: 'High (80%)'
+    };
 
     const sample = {
       site: {
@@ -2436,81 +2661,9 @@ export async function GET(request: Request) {
         guidelineLinks
       },
       planningOptions,
-      recommendations: [
-        {
-          category: 'Proceedable Pathways',
-          title: 'Progress Complying Development Certificate (CDC) duplex documentation',
-          detail:
-            'Advance the Complying Development Certificate (CDC)-ready duplex scheme with architectural, Building Sustainability Index (BASIX), bushfire and flood reporting so that a complying certificate can be issued immediately after due diligence.',
-          sources: [
-            {
-              label: 'Codes SEPP Part 3A Dual Occupancies',
-              url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572#pt.3A'
-            }
-          ]
-        },
-        {
-          category: 'Risk Flags',
-          title: 'Verify terrace frontage and flood constraints',
-          detail:
-            'Confirm usable frontage >=21 m via survey, then resolve flood and overland flow design to keep terrace Complying Development Certificate (CDC) and Development Application (DA) pathways viable.',
-          sources: [
-            {
-              label: 'NSW LotSearch - Common/LotSearch',
-              url: LOT_SEARCH_DATASHEET
-            }
-          ]
-        },
-        {
-          category: 'Further Investigation',
-          title: 'Test Transport Oriented Development (TOD) / town centre apartment scheme',
-          detail:
-            'Model a 4-6 storey apartment concept aligned with Transport Oriented Development (TOD) design excellence criteria; validate deep soil, parking and infrastructure upgrades with NSW Planning.',
-          sources: [
-            {
-              label: 'Housing SEPP Low and Mid-Rise Housing',
-              url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643'
-            }
-          ]
-        },
-        {
-          category: 'High Risk / Likely Refusal',
-          title: 'Apartments without Transport Oriented Development (TOD) / town centre mapping',
-          detail:
-            'Outside Transport Oriented Development (TOD)/town centre activation apartments face refusal-pursue planning proposal or await Housing SEPP commencement before lodging.',
-          sources: [
-            {
-              label: 'NSW Planning - Transport Oriented Development (TOD) Program',
-              url: 'https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy'
-            }
-          ]
-        }
-      ],
+      recommendations,
       comparableSales,
-      developmentActivity: [
-        {
-          applicationNumber: 'DA2023/1122',
-          address: '5 Victor Road, Dee Why NSW 2099',
-          description: 'Dual occupancy (attached) with Torrens title subdivision.',
-          status: 'Approved',
-          decisionDate: '2023-08-14',
-          source: {
-            label: 'Northern Beaches Council Development Application (DA) Tracker',
-            url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
-          }
-        },
-        {
-          applicationNumber: 'DA2024/0210',
-          address: '28 Redman Road, Dee Why NSW 2099',
-          description: 'Four storey shop-top housing with ground floor retail and 12 apartments.',
-          status: 'Under assessment',
-          decisionDate: '2024-05-30',
-          source: {
-            label: 'Northern Beaches Council Development Application (DA) Tracker',
-            url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
-          }
-        }
-      ],
+      developmentActivity,
       similarApprovedProjects: [
         {
           title: 'Coastal Transit Apartments',
@@ -2575,26 +2728,7 @@ export async function GET(request: Request) {
           }
         ]
       },
-      recommendationSummary: {
-        headline: 'Deliver Complying Development Certificate (CDC) duplex immediately while progressing Transport Oriented Development (TOD)/town centre uplift investigations.',
-        status: 'Go (conditional)',
-        rationalePoints: [
-          'Codes SEPP duplex pathway is compliant with frontage, area, and hazard certification.',
-          `Transport Oriented Development (TOD) / town centre mapping offers apartment upside subject to design excellence (${todBand} Transport Oriented Development (TOD) band, ${townCentreBand} town centre band).`,
-          townCentreSummary,
-          'Market evidence supports duplex pricing above $2.3m per dwelling, reinforcing baseline feasibility.'
-        ],
-        nextSteps: [
-          'Finalize Complying Development Certificate (CDC) duplex documentation and secure complying development certificate.',
-          'Engage NSW Planning Transport Oriented Development (TOD) delivery team to clarify frontage, deep soil, and infrastructure expectations.',
-          todNextStep
-        ],
-        risks: [
-          'Flood, overland flow and bushfire certification required to retain Complying Development Certificate (CDC) eligibility.',
-          'Transport Oriented Development (TOD) uplift contingent on Housing SEPP commencement-monitor mapping and policy updates.'
-        ],
-        confidenceRating: 'High (80%)'
-      }
+      recommendationSummary
     };
 
     return NextResponse.json({ ok: true, data: sample }, { status: 200 });

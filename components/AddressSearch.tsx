@@ -50,6 +50,11 @@ type FsrHeightBonus = {
 
 type PlanningOptionCategory = "lmr" | "hda" | "cdc" | "da";
 
+type SetbackSummary = {
+  summary: string;
+  source: PlanningSource;
+};
+
 type PlanningOption = {
   slug: string;
   title: string;
@@ -65,6 +70,7 @@ type PlanningOption = {
   fsrHeightBonuses?: FsrHeightBonus[];
   notes?: string[];
   clauses: PlanningSource[];
+  setbacks?: SetbackSummary;
 };
 
 type PlanningOptionColumn = {
@@ -924,10 +930,12 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
             3. Planning Options
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
-            Review available approval pathways. Cards highlight key controls and the summary table
-            translates each pathway into a status snapshot.
+            Review available approval pathways. Begin with the status summary table, then dive
+            into each pathway card for controls, evidence, and next steps.
           </p>
         </div>
+
+        <PlanningOptionSummaryTable options={planningOptions} />
 
         <div style={{ display: "grid", gap: "1.5rem" }}>
           {planningColumns.map((column) => (
@@ -947,7 +955,6 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           ))}
         </div>
 
-        <PlanningOptionSummaryTable options={planningOptions} />
         {generatedAtDisplay && (
           <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748b" }}>
             Planning pathway data captured {generatedAtDisplay} AEST. Sources include NSW Housing
@@ -1177,30 +1184,38 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
               </p>
             </header>
             <div style={{ display: "grid", gap: "0.85rem" }}>
-              {developmentActivity.map((item) => (
-                <article
-                  key={item.applicationNumber}
-                  style={{
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "10px",
-                    padding: "0.85rem",
-                    display: "grid",
-                    gap: "0.35rem",
-                    backgroundColor: "#fdf4ff"
-                  }}
-                >
-                  <strong style={{ color: "#0f172a" }}>
-                    {item.applicationNumber} • {item.status}
-                  </strong>
-                  <span style={{ color: "#475569", fontSize: "0.9rem" }}>
-                    {item.address} • Decided {new Date(item.decisionDate).toLocaleDateString("en-AU")}
-                  </span>
-                  <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
-                    {item.description}
-                  </p>
-                  <SourceList heading="Source" items={[item.source]} />
-                </article>
-              ))}
+              {developmentActivity.length === 0 ? (
+                <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
+                  No aligned development applications have been determined in the past 12 months.
+                  Continue monitoring the council tracker for emerging approvals.
+                </p>
+              ) : (
+                developmentActivity.map((item) => (
+                  <article
+                    key={item.applicationNumber}
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: "10px",
+                      padding: "0.85rem",
+                      display: "grid",
+                      gap: "0.35rem",
+                      backgroundColor: "#fdf4ff"
+                    }}
+                  >
+                    <strong style={{ color: "#0f172a" }}>
+                      {item.applicationNumber} | {item.status}
+                    </strong>
+                    <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                      {item.address} | Decided{" "}
+                      {new Date(item.decisionDate).toLocaleDateString("en-AU")}
+                    </span>
+                    <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
+                      {item.description}
+                    </p>
+                    <SourceList heading="Source" items={[item.source]} />
+                  </article>
+                ))
+              )}
             </div>
           </div>
 
@@ -2103,6 +2118,7 @@ type PlanningOptionCardProps = {
 function PlanningOptionCard({ option }: PlanningOptionCardProps) {
   const primaryConstraints = option.constraints.slice(0, 2);
   const remainingConstraints = option.constraints.length - primaryConstraints.length;
+  const setbacksSource = option.setbacks?.source;
 
   const parseFirstNumber = (input?: string) => {
     if (!input) return null;
@@ -2245,6 +2261,37 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
             fallbackPermitted={option.isPermitted}
           />
         </div>
+        {option.setbacks && (
+          <section>
+            <strong
+              style={{
+                display: "block",
+                marginBottom: "0.35rem",
+                color: "#0f172a",
+                fontSize: "0.9rem"
+              }}
+            >
+              Indicative residential setbacks
+            </strong>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.4 }}>
+              {option.setbacks.summary}
+            </p>
+            {setbacksSource && (
+              setbacksSource.url ? (
+                <a
+                  href={setbacksSource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "#1d4ed8", fontSize: "0.85rem", marginTop: "0.35rem", display: "inline-flex" }}
+                >
+                  {setbacksSource.label}
+                </a>
+              ) : (
+                <span style={{ color: "#475569", fontSize: "0.8rem" }}>{setbacksSource.label}</span>
+              )
+            )}
+          </section>
+        )}
         <section>
           <strong
             style={{
@@ -2626,12 +2673,3 @@ function siteSummaryEntries(site: PlanningResult['site']) {
 
   return entries;
 }
-
-
-
-
-
-
-
-
-
