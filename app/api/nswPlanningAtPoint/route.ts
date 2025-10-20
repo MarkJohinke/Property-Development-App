@@ -843,8 +843,8 @@ async function fetchCadastreLotArea(
     let geometryAreaSquareMeters: number | null = null;
     if (Array.isArray(rings) && rings.length > 0) {
       const firstRing = rings[0];
-      const geometryPoints = firstRing.map(([x, y]) => ({ x, y }));
-      const candidateArea = computePolygonArea(geometryPoints);
+      const mercatorPoints = firstRing.map(([lon, lat]) => toWebMercator(lon, lat));
+      const candidateArea = computePolygonArea(mercatorPoints);
       geometryAreaSquareMeters = isFiniteNumber(candidateArea) ? candidateArea : null;
     }
 
@@ -2708,13 +2708,18 @@ export async function GET(request: Request) {
               type: 'Contingency (10%)',
               amount: 472058.18725
             }
-          ],
-          softCosts: 3717900.82,
-          holdingCosts: 593036.7551007548,
-          saleComparables: [
-            '14 Ocean View Drive, Dee Why NSW 2099 - $2.45m (Mar 2024)',
-            '21 Foreshore Avenue, Collaroy NSW 2097 - $2.32m (Nov 2023)'
-          ]
+        ],
+        softCosts: 3717900.82,
+        sellingCosts: {
+          total: 1165035.41,
+          agentCommission: 288908.03,
+          gst: 876127.38
+        },
+        holdingCosts: 593036.7551007548,
+        saleComparables: [
+          '14 Ocean View Drive, Dee Why NSW 2099 - $2.45m (Mar 2024)',
+          '21 Foreshore Avenue, Collaroy NSW 2097 - $2.32m (Nov 2023)'
+        ]
         },
         decision: {
           goNoGo: 'Go (conditional)',

@@ -144,6 +144,11 @@ type Feasibility = {
     softCosts: number;
     holdingCosts?: number;
     contingencyPercent?: number;
+    sellingCosts?: {
+      total: number;
+      agentCommission: number;
+      gst: number;
+    };
     saleComparables: string[];
   };
   decision: {
@@ -776,6 +781,9 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
     0
   );
   const softCostsValue = feasibility.costBreakdown.softCosts ?? 0;
+  const sellingCosts = feasibility.costBreakdown.sellingCosts;
+  const gstOnSales = sellingCosts?.gst ?? 0;
+  const softCostsExGst = Math.max(softCostsValue - gstOnSales, 0);
   const holdingCostsValue = feasibility.costBreakdown.holdingCosts ?? 0;
   const totalCost =
     feasibility.costBreakdown.landCost + buildCostTotal + softCostsValue + holdingCostsValue;
@@ -793,8 +801,12 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
     },
     {
       item: "Soft Costs",
-      estimate: currencyFormatter.format(softCostsValue),
-      note: "Consultants and approvals"
+      estimate: currencyFormatter.format(softCostsExGst),
+      note: `Consultants, approvals, operations${
+        sellingCosts?.agentCommission
+          ? ` (agent commission ${currencyFormatter.format(sellingCosts.agentCommission)})`
+          : ""
+      }`
     },
     {
       item: "Holding Costs",
@@ -817,6 +829,20 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       note: `Margin ${feasibility.metrics.marginOnCostPercent}%`
     }
   ];
+
+  if (gstOnSales > 0) {
+    const softIndex = feasibilityRows.findIndex((row) => row.item === "Soft Costs");
+    const gstRow = {
+      item: "GST on sales (margin scheme)",
+      estimate: currencyFormatter.format(gstOnSales),
+      note: "Margin scheme GST payable at settlement"
+    };
+    if (softIndex >= 0) {
+      feasibilityRows.splice(softIndex + 1, 0, gstRow);
+    } else {
+      feasibilityRows.splice(2, 0, gstRow);
+    }
+  }
 
   const recommendationGroups = useMemo(
     () => [
@@ -2721,3 +2747,6 @@ function siteSummaryEntries(site: PlanningResult['site']) {
 
   return entries;
 }
+
+
+
