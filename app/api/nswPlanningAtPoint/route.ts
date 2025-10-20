@@ -2613,7 +2613,11 @@ export async function GET(request: Request) {
         (a, b) =>
           new Date(b.decisionDate).getTime() - new Date(a.decisionDate).getTime()
       )
-      .map(({ tags: _tags, ...rest }) => rest);
+      .map((application) => {
+        const { tags, ...rest } = application;
+        void tags;
+        return rest;
+      });
 
     const recommendationSummary = {
       headline:
@@ -2740,6 +2744,7 @@ export async function GET(request: Request) {
     );
   }
 }
+
 
 
 

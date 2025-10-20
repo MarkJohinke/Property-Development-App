@@ -297,6 +297,8 @@ const interpretMapsLoaderError = (error: unknown): string => {
 };
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+const BODY_FONT_SIZE = "0.95rem";
+const TABLE_FONT_SIZE = "0.9rem";
 
 const glossaryEntries: Array<{ term: string; definition: string; url?: string }> = [
   {
@@ -677,7 +679,7 @@ export default function AddressSearch() {
       )}
 
       {mapError && (
-        <p style={{ color: "#b91c1c", margin: 0, fontSize: "0.85rem" }}>
+        <p style={{ color: "#b91c1c", margin: 0, fontSize: BODY_FONT_SIZE }}>
           Google Maps API error: {mapError} Fallback imagery will be used.
         </p>
       )}
@@ -714,27 +716,27 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
     }> = [
       {
         key: "lmr",
-        heading: "Low and Mid-Rise (LMR) uplift (apartments)",
+        heading: "Low and Mid-Rise (LMR) Uplift (Apartments)",
         description:
           "Low and Mid-Rise uplift opportunities within Transport Oriented Development (TOD) and town centre programs."
       },
       {
         key: "hda",
-        heading: "Housing Diversity Amendment (HDA) pathways",
+        heading: "Housing Diversity Amendment (HDA) Pathways",
         description:
           "Housing Diversity Amendment scenarios focused on affordable housing and future HDA mapping uplift."
       },
       {
         key: "cdc",
-        heading: "Complying Development Certificate (CDC) pathways - duplex & terrace",
+        heading: "Complying Development Certificate (CDC) Pathways - Duplex & Terrace",
         description:
-          "Complying Development Certificate options for duplex and terrace delivery where Codes SEPP criteria are satisfied."
+          "Complying Development Certificate options for Duplex and terrace delivery where Codes SEPP criteria are satisfied."
       },
       {
         key: "da",
-        heading: "Development Application (DA) pathways - merit assessment",
+        heading: "Development Application (DA) Pathways - Merit Assessment",
         description:
-          "Development Application routes (duplex, terraces, apartments) including clause 4.6 and design excellence pathways."
+          "Development Application routes (Duplex, terraces, apartments) including clause 4.6 and design excellence pathways."
       }
     ];
 
@@ -860,7 +862,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
             2. Site Data & Zoning Summary
           </h2>
-          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
             Controls sourced from the relevant Local Environmental Plan and NSW Planning Portal
             datasets. Linked clauses provide authoritative mapping references.
           </p>
@@ -886,13 +888,13 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                   gap: "0.45rem"
                 }}
               >
-                <span style={{ fontSize: "0.85rem", color: "#64748b" }}>{metric.label}</span>
+                <span style={{ fontSize: BODY_FONT_SIZE, color: "#64748b" }}>{metric.label}</span>
                 <strong style={{ fontSize: "1.1rem", color: "#0f172a" }}>{metric.value}</strong>
                 <a
                   href={metric.linkUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: "0.85rem" }}
+                  style={{ fontSize: BODY_FONT_SIZE }}
                 >
                   {metric.linkLabel}
                 </a>
@@ -910,7 +912,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
             {siteSummaryEntries(site).map(({ label, value }) => (
               <div key={label}>
                 <dt style={{ fontWeight: 600, color: "#1f2937" }}>{label}</dt>
-                <dd style={{ margin: 0, color: "#475569" }}>{value}</dd>
+                <dd style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>{value}</dd>
               </div>
             ))}
           </dl>
@@ -929,7 +931,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
             3. Planning Options
           </h2>
-          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
             Review available approval pathways. Begin with the status summary table, then dive
             into each pathway card for controls, evidence, and next steps.
           </p>
@@ -942,7 +944,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
             <div key={column.key} style={{ display: "grid", gap: "0.9rem" }}>
               <div>
                 <h3 style={{ margin: 0, color: "#0f172a" }}>{column.heading}</h3>
-                <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.5 }}>
+                <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.5, fontSize: BODY_FONT_SIZE }}>
                   {column.description}
                 </p>
               </div>
@@ -969,7 +971,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
             5. Additional Guidance
           </h2>
-          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
             Use these action cards to progress the preferred pathway while managing identified
             risks and investigation items.
           </p>
@@ -998,7 +1000,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
             6. Comparable Sales & Development Activity
           </h2>
-          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
             Comparable evidence and nearby development activity sourced from NSW Planning Portal
             and market intelligence datasets.
           </p>
@@ -1024,12 +1026,12 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           >
             <header>
               <h3 style={{ margin: 0, color: "#0f172a" }}>Sales Comparables</h3>
-              <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>
-                Evidence of duplex, terrace, and Low and Mid-Rise (LMR) outcomes supporting the feasibility assumptions.
+              <p style={{ margin: "0.35rem 0 0", color: "#475569", fontSize: BODY_FONT_SIZE }}>
+                Evidence of Duplex, terrace, and Low and Mid-Rise (LMR) outcomes supporting the feasibility assumptions.
               </p>
             </header>
             {pricedComparableSales.length === 0 ? (
-              <p style={{ margin: 0, color: "#475569" }}>
+              <p style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>
                 No priced comparable sales available for this search.
               </p>
             ) : (
@@ -1039,7 +1041,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                     width: "100%",
                     borderCollapse: "collapse",
                     minWidth: "720px",
-                    fontSize: "0.8rem"
+                    fontSize: TABLE_FONT_SIZE
                   }}
                 >
                   <thead>
@@ -1084,7 +1086,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                               rowSpan={2}
                               style={{
                                 padding: "0.6rem",
-                                color: "#334155",
+                                color: "#334155", fontSize: TABLE_FONT_SIZE,
                                 fontWeight: 600,
                                 verticalAlign: "top",
                                 width: "40px"
@@ -1095,24 +1097,24 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                             <td colSpan={6} style={{ padding: "0.6rem", color: "#0f172a", fontWeight: 600 }}>
                               <div>{sale.address}</div>
                               {sale.comment && (
-                                <div style={{ color: "#64748b", fontSize: "0.8rem", marginTop: "0.2rem", fontWeight: 500 }}>
+                                <div style={{ color: "#64748b", fontSize: TABLE_FONT_SIZE, marginTop: "0.2rem", fontWeight: 500 }}>
                                   {sale.comment}
                                 </div>
                               )}
                             </td>
                           </tr>
                           <tr style={{ backgroundColor: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
-                            <td style={{ padding: "0.6rem", color: "#475569" }}>{sale.type}</td>
-                            <td style={{ padding: "0.6rem", color: "#475569" }}>{saleDateLabel}</td>
-                            <td style={{ padding: "0.6rem", color: "#475569" }}>{priceLabel}</td>
-                            <td style={{ padding: "0.6rem", color: "#475569" }}>{landArea}</td>
-                            <td style={{ padding: "0.6rem", color: "#475569" }}>{rateLabel}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>{sale.type}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>{saleDateLabel}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>{priceLabel}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>{landArea}</td>
+                            <td style={{ padding: "0.6rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>{rateLabel}</td>
                             <td style={{ padding: "0.6rem" }}>
                               <a
                                 href={sale.source.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                style={{ color: "#1d4ed8" }}
+                                style={{ color: "#1d4ed8", fontSize: TABLE_FONT_SIZE }}
                               >
                                 {sale.source.label}
                               </a>
@@ -1142,7 +1144,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                                     );
                                   })()}
                                   {sale.landAreaSources && sale.landAreaSources.length > 0 && (
-                                    <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#475569", fontSize: "0.8rem" }}>
+                                    <ul style={{ margin: 0, paddingLeft: "1.2rem", color: "#475569", fontSize: TABLE_FONT_SIZE }}>
                                       {sale.landAreaSources.map((source, sourceIndex) => (
                                         <li key={source.source + sourceIndex}>{formatLandAreaSource(source)}</li>
                                       ))}
@@ -1179,13 +1181,13 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           >
             <header>
               <h3 style={{ margin: 0, color: "#0f172a" }}>Nearby Development Applications</h3>
-              <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>
+              <p style={{ margin: "0.35rem 0 0", color: "#475569", fontSize: BODY_FONT_SIZE }}>
                 Council and state assessed applications signalling appetite for uplift in the area.
               </p>
             </header>
             <div style={{ display: "grid", gap: "0.85rem" }}>
               {developmentActivity.length === 0 ? (
-                <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
+                <p style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>
                   No aligned development applications have been determined in the past 12 months.
                   Continue monitoring the council tracker for emerging approvals.
                 </p>
@@ -1205,11 +1207,11 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                     <strong style={{ color: "#0f172a" }}>
                       {item.applicationNumber} | {item.status}
                     </strong>
-                    <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                    <span style={{ color: "#475569", fontSize: BODY_FONT_SIZE }}>
                       {item.address} | Decided{" "}
                       {new Date(item.decisionDate).toLocaleDateString("en-AU")}
                     </span>
-                    <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
+                    <p style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>
                       {item.description}
                     </p>
                     <SourceList heading="Source" items={[item.source]} />
@@ -1231,7 +1233,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           >
             <header>
               <h3 style={{ margin: 0, color: "#0f172a" }}>Similar Approved Projects</h3>
-              <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>
+              <p style={{ margin: "0.35rem 0 0", color: "#475569", fontSize: BODY_FONT_SIZE }}>
                 Benchmark consents to test design language, staging, and conditions of approval.
               </p>
             </header>
@@ -1249,10 +1251,10 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                   }}
                 >
                   <strong style={{ color: "#0f172a" }}>{project.title}</strong>
-                  <span style={{ color: "#475569", fontSize: "0.9rem" }}>
+                  <span style={{ color: "#475569", fontSize: BODY_FONT_SIZE }}>
                     {project.address} • Approved {new Date(project.approvalDate).toLocaleDateString("en-AU")}
                   </span>
-                  <p style={{ margin: 0, color: "#475569", fontSize: "0.9rem" }}>
+                  <p style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>
                     {project.headlineMetric}
                   </p>
                   <SourceList heading="Documentation" items={[project.link]} />
@@ -1278,7 +1280,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
         >
           <div>
             <h3 style={{ margin: 0, color: "#0f172a" }}>Summary</h3>
-            <p style={{ margin: "0.35rem 0 0", color: "#475569" }}>{feasibility.summary}</p>
+            <p style={{ margin: "0.35rem 0 0", color: "#475569", fontSize: BODY_FONT_SIZE }}>{feasibility.summary}</p>
           </div>
           <div style={{ overflowX: "auto" }}>
             <table
@@ -1296,7 +1298,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                       style={{
                         textAlign: "left",
                         padding: "0.75rem",
-                        fontSize: "0.85rem",
+                        fontSize: BODY_FONT_SIZE,
                         backgroundColor: "#f1f5f9",
                         color: "#0f172a",
                         borderBottom: "1px solid #cbd5f5"
@@ -1314,7 +1316,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
                       style={{
                         padding: "0.75rem",
                         borderTop: "1px solid #dfe3f0",
-                        color: "#1e293b",
+                        color: "#1e293b", fontSize: TABLE_FONT_SIZE,
                         fontWeight: 600,
                         width: "30%"
                       }}
@@ -1348,7 +1350,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
           </div>
           <div>
             <h3 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Assumptions</h3>
-            <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "#475569" }}>
+            <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>
               {feasibility.assumptions.map((assumption) => (
                 <li key={assumption}>{assumption}</li>
               ))}
@@ -1375,7 +1377,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
             gap: "0.75rem"
           }}
         >
-          <p style={{ margin: 0, color: "#475569" }}>
+          <p style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>
             Abbreviations used throughout the report are expanded here for clarity.
           </p>
           <dl
@@ -1389,13 +1391,13 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
             {glossaryEntries.map((entry) => (
               <div key={entry.term}>
                 <dt style={{ fontWeight: 600, color: "#0f172a" }}>{entry.term}</dt>
-                <dd style={{ margin: 0, color: "#475569" }}>
+                <dd style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>
                   {entry.url ? (
                     <a
                       href={entry.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: "#1d4ed8" }}
+                      style={{ color: "#1d4ed8", fontSize: TABLE_FONT_SIZE }}
                     >
                       {entry.definition}
                     </a>
@@ -1528,7 +1530,7 @@ function MapImagery({ site, mapsReady, mapError }: MapImageryProps) {
         <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
           1. Site Context
         </h2>
-        <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+        <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
           Visualise the parcel immediately after entering the address. Satellite imagery centres on
           the lot and Street View appears whenever Google coverage is available for the frontage.
         </p>
@@ -1655,7 +1657,7 @@ function MapImagery({ site, mapsReady, mapError }: MapImageryProps) {
       <p
         style={{
           margin: 0,
-          fontSize: "0.85rem",
+          fontSize: BODY_FONT_SIZE,
           color: "#64748b",
           textAlign: "center"
         }}
@@ -1823,7 +1825,7 @@ function ComparableSalesMap({ site, comparables, mapsReady, mapError }: Comparab
               borderRadius: "10px",
               backgroundColor: "rgba(15, 23, 42, 0.75)",
               color: "#f8fafc",
-              fontSize: "0.85rem",
+              fontSize: BODY_FONT_SIZE,
               lineHeight: 1.4
             }}
           >
@@ -1842,7 +1844,7 @@ function ComparableSalesMap({ site, comparables, mapsReady, mapError }: Comparab
             borderRadius: "10px",
             backgroundColor: "rgba(15, 23, 42, 0.6)",
             color: "#f8fafc",
-            fontSize: "0.85rem",
+            fontSize: BODY_FONT_SIZE,
             lineHeight: 1.4
           }}
         >
@@ -1875,7 +1877,7 @@ function ComparableSalesMap({ site, comparables, mapsReady, mapError }: Comparab
           borderRadius: "10px",
           backgroundColor: "rgba(15, 23, 42, 0.6)",
           color: "#f8fafc",
-          fontSize: "0.85rem",
+          fontSize: BODY_FONT_SIZE,
           lineHeight: 1.4
         }}
       >
@@ -1895,7 +1897,7 @@ function RecommendationSummarySection({ summary }: RecommendationSummarySectionP
         <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
           4. Recommendation Summary
         </h2>
-        <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6 }}>
+        <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
           Snapshot of the recommended pathway, supporting rationale, and next steps.
         </p>
       </div>
@@ -1921,7 +1923,7 @@ function RecommendationSummarySection({ summary }: RecommendationSummarySectionP
         </div>
         <div>
           <h4 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Why this path</h4>
-          <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "#475569" }}>
+          <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>
             {summary.rationalePoints.map((point) => (
               <li key={point}>{point}</li>
             ))}
@@ -1929,7 +1931,7 @@ function RecommendationSummarySection({ summary }: RecommendationSummarySectionP
         </div>
         <div>
           <h4 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Next steps</h4>
-          <ol style={{ margin: 0, paddingLeft: "1.4rem", color: "#475569" }}>
+          <ol style={{ margin: 0, paddingLeft: "1.4rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>
             {summary.nextSteps.map((step) => (
               <li key={step}>{step}</li>
             ))}
@@ -1993,7 +1995,7 @@ function RecommendationColumn({ title, items, accentColor }: RecommendationColum
             }}
           >
             <strong style={{ color: "#0f172a" }}>{item.title}</strong>
-            <p style={{ margin: 0, color: "#475569" }}>{item.detail}</p>
+            <p style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>{item.detail}</p>
             <SourceList heading="Sources" items={item.sources} />
           </article>
         ))}
@@ -2049,43 +2051,45 @@ function PlanningOptionSummaryTable({ options }: PlanningOptionSummaryTableProps
         style={{
           width: "100%",
           borderCollapse: "collapse",
-          minWidth: "560px"
+          minWidth: "560px",
+          fontSize: TABLE_FONT_SIZE
         }}
       >
         <caption
           style={{
             textAlign: "left",
-          padding: "1rem 1.25rem 0.5rem",
-          fontWeight: 600,
-          color: "#0f172a"
-        }}
-      >
-        Status summary
-      </caption>
-      <thead>
-        <tr>
-          <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
-            Pathway
+            padding: "1rem 1.25rem 0.5rem",
+            fontWeight: 600,
+            color: "#0f172a",
+            fontSize: TABLE_FONT_SIZE
+          }}
+        >
+          Status summary
+        </caption>
+        <thead>
+          <tr>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569", fontSize: TABLE_FONT_SIZE }}>
+              Pathway
             </th>
-          <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
-            Category
-          </th>
-          <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
-            Status
-          </th>
-          <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569" }}>
-            Key trigger
-          </th>
-        </tr>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569", fontSize: TABLE_FONT_SIZE }}>
+              Category
+            </th>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569", fontSize: TABLE_FONT_SIZE }}>
+              Status
+            </th>
+            <th style={{ textAlign: "left", padding: "0.75rem 1.25rem", color: "#475569", fontSize: TABLE_FONT_SIZE }}>
+              Key trigger
+            </th>
+          </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.key} style={{ borderTop: "1px solid #e2e8f0" }}>
-              <td style={{ padding: "0.85rem 1.25rem", color: "#0f172a", fontWeight: 600 }}>
+              <td style={{ padding: "0.85rem 1.25rem", color: "#0f172a", fontWeight: 600, fontSize: TABLE_FONT_SIZE }}>
                 {row.title}
               </td>
-              <td style={{ padding: "0.85rem 1.25rem", color: "#475569" }}>{row.category}</td>
-              <td style={{ padding: "0.85rem 1.25rem" }}>
+              <td style={{ padding: "0.85rem 1.25rem", color: "#475569", fontSize: TABLE_FONT_SIZE }}>{row.category}</td>
+              <td style={{ padding: "0.85rem 1.25rem", fontSize: TABLE_FONT_SIZE }}>
                 <span
                   style={{
                     display: "inline-flex",
@@ -2095,13 +2099,13 @@ function PlanningOptionSummaryTable({ options }: PlanningOptionSummaryTableProps
                     backgroundColor: row.palette.bg,
                     color: row.palette.fg,
                     fontWeight: 600,
-                fontSize: "0.85rem"
-              }}
-            >
-              {row.statusLabel}
-            </span>
-          </td>
-              <td style={{ padding: "0.85rem 1.25rem", color: "#475569", lineHeight: 1.5 }}>
+                    fontSize: TABLE_FONT_SIZE
+                  }}
+                >
+                  {row.statusLabel}
+                </span>
+              </td>
+              <td style={{ padding: "0.85rem 1.25rem", color: "#475569", lineHeight: 1.5, fontSize: TABLE_FONT_SIZE }}>
                 {row.trigger}
               </td>
             </tr>
@@ -2119,6 +2123,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
   const primaryConstraints = option.constraints.slice(0, 2);
   const remainingConstraints = option.constraints.length - primaryConstraints.length;
   const setbacksSource = option.setbacks?.source;
+  const showDetailedSections = option.isPermitted;
 
   const parseFirstNumber = (input?: string) => {
     if (!input) return null;
@@ -2250,7 +2255,14 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
       >
         <div>
           <h4 style={{ margin: 0, fontSize: "1.1rem", color: "#0f172a" }}>{option.title}</h4>
-          <p style={{ margin: "0.3rem 0 0", color: "#475569", lineHeight: 1.5 }}>
+          <p
+            style={{
+              margin: "0.3rem 0 0",
+              color: "#475569",
+              lineHeight: 1.5,
+              fontSize: BODY_FONT_SIZE
+            }}
+          >
             {option.rationale}
           </p>
         </div>
@@ -2261,19 +2273,19 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
             fallbackPermitted={option.isPermitted}
           />
         </div>
-        {option.setbacks && (
+        {showDetailedSections && option.setbacks && (
           <section>
             <strong
               style={{
                 display: "block",
                 marginBottom: "0.35rem",
                 color: "#0f172a",
-                fontSize: "0.9rem"
+                fontSize: BODY_FONT_SIZE
               }}
             >
               Indicative residential setbacks
             </strong>
-            <p style={{ margin: 0, color: "#475569", lineHeight: 1.4 }}>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.4, fontSize: BODY_FONT_SIZE }}>
               {option.setbacks.summary}
             </p>
             {setbacksSource && (
@@ -2282,37 +2294,48 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                   href={setbacksSource.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "#1d4ed8", fontSize: "0.85rem", marginTop: "0.35rem", display: "inline-flex" }}
+                  style={{
+                    color: "#1d4ed8",
+                    fontSize: BODY_FONT_SIZE,
+                    marginTop: "0.35rem",
+                    display: "inline-flex"
+                  }}
                 >
                   {setbacksSource.label}
                 </a>
               ) : (
-                <span style={{ color: "#475569", fontSize: "0.8rem" }}>{setbacksSource.label}</span>
+                <span style={{ color: "#475569", fontSize: BODY_FONT_SIZE }}>
+                  {setbacksSource.label}
+                </span>
               )
             )}
           </section>
         )}
-        <section>
-          <strong
-            style={{
-              display: "block",
-              marginBottom: "0.35rem",
-              color: "#0f172a",
-              fontSize: "0.9rem"
-            }}
-          >
-            Zoning compatibility
-          </strong>
-          <p style={{ margin: 0, color: "#475569", lineHeight: 1.4 }}>{option.zoneCompatibility}</p>
-        </section>
-        {option.governingFactors && option.governingFactors.length > 0 && (
+        {showDetailedSections && (
           <section>
             <strong
               style={{
                 display: "block",
                 marginBottom: "0.35rem",
                 color: "#0f172a",
-                fontSize: "0.9rem"
+                fontSize: BODY_FONT_SIZE
+              }}
+            >
+              Zoning compatibility
+            </strong>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.4, fontSize: BODY_FONT_SIZE }}>
+              {option.zoneCompatibility}
+            </p>
+          </section>
+        )}
+        {showDetailedSections && option.governingFactors && option.governingFactors.length > 0 && (
+          <section>
+            <strong
+              style={{
+                display: "block",
+                marginBottom: "0.35rem",
+                color: "#0f172a",
+                fontSize: BODY_FONT_SIZE
               }}
             >
               Governing factors
@@ -2321,7 +2344,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
-                fontSize: "0.85rem",
+                fontSize: TABLE_FONT_SIZE,
                 color: "#475569"
               }}
             >
@@ -2333,7 +2356,8 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                       padding: "0.45rem 0.6rem 0.45rem 0",
                       borderBottom: "1px solid #e2e8f0",
                       color: "#0f172a",
-                      fontWeight: 600
+                      fontWeight: 600,
+                      fontSize: TABLE_FONT_SIZE
                     }}
                   >
                     Factor
@@ -2344,7 +2368,8 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                       padding: "0.45rem 0.6rem",
                       borderBottom: "1px solid #e2e8f0",
                       color: "#0f172a",
-                      fontWeight: 600
+                      fontWeight: 600,
+                      fontSize: TABLE_FONT_SIZE
                     }}
                   >
                     Details
@@ -2367,7 +2392,8 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                           textAlign: "left",
                           fontWeight: 600,
                           color: "#0f172a",
-                          padding: "0.4rem 0.6rem 0.4rem 0"
+                          padding: "0.4rem 0.6rem 0.4rem 0",
+                          fontSize: TABLE_FONT_SIZE
                         }}
                       >
                         {source ? (
@@ -2375,7 +2401,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                             href={source.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: "#0f172a", textDecoration: "underline" }}
+                            style={{ color: "#0f172a", textDecoration: "underline", fontSize: TABLE_FONT_SIZE }}
                           >
                             {factor.label}
                           </a>
@@ -2383,18 +2409,18 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                           factor.label
                         )}
                       </th>
-                      <td style={{ padding: "0.4rem 0", lineHeight: 1.4 }}>
+                      <td style={{ padding: "0.4rem 0", lineHeight: 1.4, fontSize: TABLE_FONT_SIZE }}>
                         <div>{factor.value}</div>
                         {factor.note && (
-                          <div style={{ color: "#64748b", marginTop: "0.2rem" }}>{factor.note}</div>
+                          <div style={{ color: "#64748b", marginTop: "0.2rem", fontSize: TABLE_FONT_SIZE }}>{factor.note}</div>
                         )}
                         {showSecondarySource && source && (
-                          <div style={{ marginTop: "0.3rem" }}>
+                          <div style={{ marginTop: "0.3rem", fontSize: TABLE_FONT_SIZE }}>
                             <a
                               href={source.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ color: "#1d4ed8" }}
+                              style={{ color: "#1d4ed8", fontSize: TABLE_FONT_SIZE }}
                             >
                               {source.label}
                             </a>
@@ -2408,14 +2434,14 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
             </table>
           </section>
         )}
-        {option.constraints.length > 0 && (
+        {showDetailedSections && option.constraints.length > 0 && (
           <section>
             <strong
               style={{
                 display: "block",
                 marginBottom: "0.35rem",
                 color: "#0f172a",
-                fontSize: "0.9rem"
+                fontSize: BODY_FONT_SIZE
               }}
             >
               Key requirements
@@ -2427,7 +2453,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                 display: "grid",
                 gap: "0.25rem",
                 color: "#475569",
-                fontSize: "0.85rem"
+                fontSize: BODY_FONT_SIZE
               }}
             >
               {primaryConstraints.map((item) => (
@@ -2437,26 +2463,30 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
             </ul>
           </section>
         )}
-        <section>
-          <strong
-            style={{
-              display: "block",
-              marginBottom: "0.35rem",
-              color: "#0f172a",
-              fontSize: "0.9rem"
-            }}
-          >
-            Envelope notes
-          </strong>
-          <p style={{ margin: 0, color: "#475569", lineHeight: 1.4 }}>{option.envelopeHint}</p>
-        </section>
+        {showDetailedSections && (
+          <section>
+            <strong
+              style={{
+                display: "block",
+                marginBottom: "0.35rem",
+                color: "#0f172a",
+                fontSize: BODY_FONT_SIZE
+              }}
+            >
+              Envelope notes
+            </strong>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.4, fontSize: BODY_FONT_SIZE }}>
+              {option.envelopeHint}
+            </p>
+          </section>
+        )}
       </div>
-      {fsrTableRows.length > 0 && (
+      {showDetailedSections && fsrTableRows.length > 0 && (
         <div style={{ padding: "0 1.25rem 1.25rem" }}>
           <h5 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Floor Space Ratio (FSR) & height bonuses</h5>
           <div style={{ overflowX: "auto" }}>
             <table
-              style={{ width: "100%", borderCollapse: "collapse", minWidth: "420px" }}
+              style={{ width: "100%", borderCollapse: "collapse", minWidth: "420px", fontSize: TABLE_FONT_SIZE }}
             >
               <thead>
                 <tr>
@@ -2466,7 +2496,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                       style={{
                         textAlign: "left",
                         padding: "0.6rem",
-                        fontSize: "0.8rem",
+                        fontSize: TABLE_FONT_SIZE,
                         backgroundColor: "#f1f5f9",
                         color: "#0f172a",
                         borderBottom: "1px solid #cbd5f5"
@@ -2491,19 +2521,19 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                         style={{
                           padding: "0.6rem",
                           borderTop: "1px solid #dfe3f0",
-                          color: "#1e293b",
+                          color: "#1e293b", fontSize: TABLE_FONT_SIZE,
                           fontWeight: isTotalRow ? 700 : 600,
                           lineHeight: 1.4
                         }}
                       >
                         <div>{row.label}</div>
                         {rowSource && (
-                          <div style={{ marginTop: "0.25rem", fontWeight: 500 }}>
+                          <div style={{ marginTop: "0.25rem", fontWeight: 500, fontSize: TABLE_FONT_SIZE }}>
                             <a
                               href={rowSource.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{ color: "#1d4ed8" }}
+                              style={{ color: "#1d4ed8", fontSize: TABLE_FONT_SIZE }}
                             >
                               {rowSource.label}
                             </a>
@@ -2514,7 +2544,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                         style={{
                           padding: "0.6rem",
                           borderTop: "1px solid #dfe3f0",
-                          color: "#334155",
+                          color: "#334155", fontSize: TABLE_FONT_SIZE,
                           fontWeight: isTotalRow ? 600 : 500
                         }}
                       >
@@ -2524,7 +2554,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
                         style={{
                           padding: "0.6rem",
                           borderTop: "1px solid #dfe3f0",
-                          color: "#334155",
+                          color: "#334155", fontSize: TABLE_FONT_SIZE,
                           fontWeight: isTotalRow ? 600 : 500
                         }}
                       >
@@ -2551,7 +2581,7 @@ function PlanningOptionCard({ option }: PlanningOptionCardProps) {
       {option.notes && option.notes.length > 0 && (
         <div style={{ padding: "0 1.25rem 1.25rem" }}>
           <h5 style={{ margin: "0 0 0.5rem", color: "#0f172a" }}>Notes</h5>
-          <ul style={{ margin: 0, paddingLeft: "1.1rem", color: "#475569", fontSize: "0.85rem" }}>
+          <ul style={{ margin: 0, paddingLeft: "1.1rem", color: "#475569", fontSize: BODY_FONT_SIZE }}>
             {option.notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
@@ -2613,7 +2643,7 @@ function StatusBadge({ label, status, fallbackPermitted }: StatusBadgeProps) {
         borderRadius: "999px",
         backgroundColor: palette.bg,
         color: palette.fg,
-        fontSize: "0.8rem",
+        fontSize: TABLE_FONT_SIZE,
         fontWeight: 600
       }}
     >
@@ -2673,3 +2703,6 @@ function siteSummaryEntries(site: PlanningResult['site']) {
 
   return entries;
 }
+
+
+
