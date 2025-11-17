@@ -225,6 +225,15 @@ type PlanningResult = {
         band: "inner" | "outer" | null;
       } | null;
     };
+    lmrEligibility?: {
+      isEligible: boolean;
+      band: string;
+      todLabel: string;
+      townCentreBand: string;
+      townCentreName: string | null;
+      summary: string;
+      improvementSummary: string;
+    };
   };
   planningOptions: PlanningOption[];
   recommendations: Recommendation[];
@@ -2797,6 +2806,36 @@ function siteSummaryEntries(site: PlanningResult['site']) {
       label: "Nearest town centre",
       value: `${nearestTownCentre.name} (${nearestTownCentre.band ?? 'outside band'}) ${distance}`.trim()
     });
+  }
+
+  if (site.lmrEligibility) {
+    const lmr = site.lmrEligibility;
+    if (lmr.isEligible) {
+      entries.push({
+        label: "Low and Mid-Rise (LMR) Eligibility",
+        value: `Eligible - ${lmr.band} band${lmr.todLabel ? ` (${lmr.todLabel})` : ''}`
+      });
+      entries.push({
+        label: "LMR Status",
+        value: lmr.summary
+      });
+    } else {
+      entries.push({
+        label: "Low and Mid-Rise (LMR) Eligibility",
+        value: "Not eligible - Outside mapped LMR areas"
+      });
+      if (lmr.townCentreBand !== 'N/A' && lmr.townCentreName) {
+        entries.push({
+          label: "LMR Status",
+          value: `${lmr.townCentreBand} band for ${lmr.townCentreName} - may enable future LMR pathways`
+        });
+      } else {
+        entries.push({
+          label: "LMR Status",
+          value: lmr.summary
+        });
+      }
+    }
   }
 
   entries.push({

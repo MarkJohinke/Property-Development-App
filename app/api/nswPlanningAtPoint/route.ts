@@ -2591,7 +2591,16 @@ export async function GET(request: Request) {
         metrics,
         dataSources,
         locationalInsights,
-        guidelineLinks
+        guidelineLinks,
+        lmrEligibility: {
+          isEligible: isLmrBand,
+          band: todBand,
+          todLabel,
+          townCentreBand,
+          townCentreName: nearestTownCentre?.name ?? null,
+          summary: lmrContextSummary,
+          improvementSummary: lmrImprovementSummary
+        }
       },
       planningOptions,
       recommendations,
