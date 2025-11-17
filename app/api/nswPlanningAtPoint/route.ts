@@ -1303,6 +1303,41 @@ async function geocodeAddress(address: string): Promise<GeocodeResult> {
   const timeout = setTimeout(() => controller.abort(), 5000);
 
   try {
+    // Use Google Geocoding API if key is available for more accurate results
+    if (GOOGLE_MAPS_KEY) {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_KEY}`;
+      const response = await fetch(url, {
+        signal: controller.signal
+      });
+
+      if (response.ok) {
+        const json = await response.json() as {
+          status: string;
+          results?: Array<{
+            geometry?: {
+              location?: {
+                lat?: number;
+                lng?: number;
+              };
+            };
+          }>;
+        };
+
+        if (json.status === 'OK' && json.results && json.results.length > 0) {
+          const location = json.results[0].geometry?.location;
+          const latitude = location?.lat;
+          const longitude = location?.lng;
+
+          if (latitude !== undefined && longitude !== undefined && 
+              Number.isFinite(latitude) && Number.isFinite(longitude)) {
+            const mapPreviewUrl = buildFallbackStaticMap(latitude, longitude);
+            return { latitude, longitude, mapPreviewUrl };
+          }
+        }
+      }
+    }
+
+    // Fallback to Nominatim if Google API is not available or fails
     const url =
       `${NOMINATIM_ENDPOINT}?format=json&limit=1&q=` +
       encodeURIComponent(address);
@@ -1796,8 +1831,8 @@ export async function GET(request: Request) {
         url: 'https://www.planning.nsw.gov.au/sites/default/files/2023-03/apartment-design-guide.pdf'
       },
       {
-        label: 'NSW Low and Mid-Rise Housing Design Guide (Draft 2024)',
-        url: 'https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy'
+        label: 'State Environmental Planning Policy (Housing) 2021 - Chapter 6',
+        url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643#pt.2-div.6'
       }
     ];
 

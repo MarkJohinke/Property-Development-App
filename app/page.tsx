@@ -70,7 +70,7 @@ export default function HomePage() {
           >
             Analyse any New South Wales (NSW) property in seconds — unlock zoning,
             overlays, planning pathways, comparable evidence, and feasibility without
-            jumping between systems. Free tier covers Housing SEPP infill checks.
+            jumping between systems. Free tier covers Housing State Environmental Planning Policy infill checks.
           </p>
           <div
             style={{
