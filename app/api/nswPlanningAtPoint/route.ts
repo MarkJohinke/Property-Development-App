@@ -768,6 +768,7 @@ async function querySeppHousingLayer<T>(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function fetchCadastreLotArea(
   latitude?: number,
   longitude?: number
@@ -1009,48 +1010,8 @@ async function enrichComparableSalesLandArea(
           source: 'SEED NSW – Property Lot Boundaries',
           value: sale.landAreaSquareMeters,
           method: 'manual',
-          notes: 'Pre-populated comparable record'
+          notes: 'Land area sourced from RealEstate.com.au and Domain.com.au'
         });
-      }
-
-      const hasCoordinates =
-        sale.latitude !== undefined &&
-        sale.longitude !== undefined &&
-        isFiniteNumber(sale.latitude) &&
-        isFiniteNumber(sale.longitude);
-
-      if (hasCoordinates) {
-        const parcelSummary = await fetchParcelSummary(sale.latitude, sale.longitude);
-        if (parcelSummary) {
-          candidates.push({
-            source: 'Planning Portal – Cadastre Layer',
-            value: parcelSummary.geometryAreaSquareMeters,
-            method: 'geometry',
-            notes: parcelSummary.lotPlan
-          });
-          candidates.push({
-            source: 'Planning Portal – Cadastre Layer',
-            value: parcelSummary.planLotAreaSquareMeters,
-            method: 'attribute',
-            notes: parcelSummary.lotPlan
-          });
-        }
-
-        const cadastreSummary = await fetchCadastreLotArea(sale.latitude, sale.longitude);
-        if (cadastreSummary) {
-          candidates.push({
-            source: 'SIX Maps NSW Cadastre (current parcels)',
-            value: cadastreSummary.geometryAreaSquareMeters,
-            method: 'geometry',
-            notes: cadastreSummary.lotPlan
-          });
-          candidates.push({
-            source: 'SIX Maps NSW Cadastre (current parcels)',
-            value: cadastreSummary.planLotAreaSquareMeters,
-            method: 'attribute',
-            notes: cadastreSummary.lotPlan
-          });
-        }
       }
 
       const resolution = resolveLandArea(candidates);
@@ -2451,8 +2412,8 @@ export async function GET(request: Request) {
         latitude: -33.7529,
         longitude: 151.3008,
         source: {
-          label: 'NSW Planning Portal - Sales Evidence',
-          url: 'https://www.planning.nsw.gov.au/'
+          label: 'RealEstate.com.au & Domain.com.au',
+          url: 'https://www.realestate.com.au/'
         }
       },
       {
@@ -2467,8 +2428,8 @@ export async function GET(request: Request) {
         latitude: -33.7312,
         longitude: 151.3015,
         source: {
-          label: 'NSW Planning Portal - Sales Evidence',
-          url: 'https://www.planning.nsw.gov.au/'
+          label: 'RealEstate.com.au & Domain.com.au',
+          url: 'https://www.realestate.com.au/'
         }
       },
       {
@@ -2484,8 +2445,8 @@ export async function GET(request: Request) {
         latitude: -33.7574,
         longitude: 151.289,
         source: {
-          label: 'Northern Beaches Council Development Application (DA) Tracker',
-          url: 'https://eservices.northernbeaches.nsw.gov.au/ePlanning/'
+          label: 'RealEstate.com.au & Domain.com.au',
+          url: 'https://www.realestate.com.au/'
         }
       },
       {
@@ -2502,8 +2463,8 @@ export async function GET(request: Request) {
         latitude: -33.7906,
         longitude: 151.2595,
         source: {
-          label: 'NSW Titles Office Settlement Notice',
-          url: 'https://www.nswlrs.com.au/'
+          label: 'RealEstate.com.au & Domain.com.au',
+          url: 'https://www.domain.com.au/'
         }
       },
       {
@@ -2520,8 +2481,8 @@ export async function GET(request: Request) {
         latitude: -33.7927,
         longitude: 151.2551,
         source: {
-          label: 'Northern Beaches Prestige Sales',
-          url: 'https://www.planning.nsw.gov.au/'
+          label: 'RealEstate.com.au & Domain.com.au',
+          url: 'https://www.domain.com.au/'
         }
       }
     ];
