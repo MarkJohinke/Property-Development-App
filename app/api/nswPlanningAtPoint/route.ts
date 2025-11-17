@@ -1299,6 +1299,53 @@ async function fetchLandZoning(
 }
 
 async function geocodeAddress(address: string): Promise<GeocodeResult> {
+  // Try Google Geocoding API first if available
+  if (GOOGLE_MAPS_KEY) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&region=au&key=${GOOGLE_MAPS_KEY}`;
+      const response = await fetch(url, {
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        console.warn('[geocodeAddress] Google Geocoding API returned non-OK status:', response.status);
+      } else {
+        const json = (await response.json()) as {
+          results?: Array<{
+            geometry?: {
+              location?: {
+                lat?: number;
+                lng?: number;
+              };
+            };
+          }>;
+          status?: string;
+        };
+
+        if (json.status === 'OK' && Array.isArray(json.results) && json.results.length > 0) {
+          const candidate = json.results[0];
+          const latitude = candidate.geometry?.location?.lat;
+          const longitude = candidate.geometry?.location?.lng;
+
+          if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+            const mapPreviewUrl = buildFallbackStaticMap(latitude, longitude);
+            return { latitude, longitude, mapPreviewUrl };
+          }
+        } else if (json.status && json.status !== 'ZERO_RESULTS') {
+          console.warn('[geocodeAddress] Google Geocoding API status:', json.status);
+        }
+      }
+    } catch (error) {
+      console.warn('[geocodeAddress] Google Geocoding API error:', error);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  // Fallback to OpenStreetMap Nominatim
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -1796,8 +1843,8 @@ export async function GET(request: Request) {
         url: 'https://www.planning.nsw.gov.au/sites/default/files/2023-03/apartment-design-guide.pdf'
       },
       {
-        label: 'NSW Low and Mid-Rise Housing Design Guide (Draft 2024)',
-        url: 'https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy'
+        label: 'State Environmental Planning Policy (Housing) 2021 - Chapter 6',
+        url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643#pt.2-div.6'
       }
     ];
 
