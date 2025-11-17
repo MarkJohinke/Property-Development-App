@@ -50,6 +50,28 @@ property-dev-app/
 - Update `AGENTS.md:1` so that contributor guidance matches the single-frontend layout, or relocate backend documentation to the appropriate repository.
 - Add automated tests (unit for formatting helpers, integration for the API route once real data is returned) and consider smoke tests that exercise an end-to-end address lookup.
 
+## Data Architecture & Documentation
+
+The Property Intelligence Engine (DevGPT) uses a comprehensive 7-layer data architecture that leverages **free NSW government datasets** for complete parcel-level planning feasibility analysis, with optional commercial add-ons for due diligence.
+
+**📚 Complete Documentation:** See [`docs/`](./docs/) for detailed architecture, data sources, and implementation guides:
+
+- **🚀 [Engine Overview](./docs/ENGINE_OVERVIEW.md)** - **START HERE** - High-level system overview, core capabilities, and processing pipeline
+- **[Data Architecture Overview](./docs/DATA_ARCHITECTURE.md)** - Complete data sources and computation model (7 layers: Cadastre, Geometry, Spatial, Administrative, Title, Derived Data, Constraints)
+- **[Architecture Flow Diagram](./docs/ARCHITECTURE_FLOW.md)** - Visual processing pipeline with Mermaid diagrams
+- **[Folder Structure Guide](./docs/FOLDER_STRUCTURE.md)** - Recommended module organization for backend implementation
+- **[Parcel Analysis Schema](./docs/PARCEL_ANALYSIS_SCHEMA.json)** - JSON schema for API responses and data structures
+- **[Documentation Hub](./docs/README.md)** - Central documentation index and quick start guides
+
+### Key Architecture Highlights
+
+- **100% Free Core Engine**: NSW Cadastre, planning overlays, elevation data, hazard datasets
+- **Automated Processing**: Address → Full feasibility report in 5-15 seconds
+- **Modular Design**: Independent engines for geometry, compliance, and feasibility
+- **Optional Add-ons**: Title search ($20-45), sales data, aerial imagery (used only at due diligence stage)
+
+For developers implementing new data sources or computation engines, start with the [Data Architecture documentation](./docs/DATA_ARCHITECTURE.md).
+
 ## Additional Resources
 - Branding assets: `Johinke Logo.png:1`, `public/johinke-logo.svg:1`.
 - Feasibility workbook reference: `Nield Avenue Feasbility - Rev 25 (10.09.2025) SHORE PROJECTS.xlsx:1` (useful for cross-checking financial assumptions).
