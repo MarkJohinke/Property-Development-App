@@ -1478,6 +1478,81 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
     </div>
   );
 }
+
+type LmrStatusDisplayProps = {
+  locationalInsights: PlanningResult['site']['locationalInsights'];
+};
+
+function LmrStatusDisplay({ locationalInsights }: LmrStatusDisplayProps) {
+  const todBand =
+    locationalInsights.todArea.isWithin
+      ? 'Inner'
+      : locationalInsights.acceleratedPrecinct.isWithin || locationalInsights.deferredArea.isWithin
+        ? 'Outer'
+        : 'N/A';
+  
+  const todLabel =
+    locationalInsights.todArea.label ??
+    locationalInsights.acceleratedPrecinct.label ??
+    locationalInsights.deferredArea.label ??
+    null;
+
+  const townCentreBand = locationalInsights.nearestTownCentre?.band;
+  const townCentreName = locationalInsights.nearestTownCentre?.name;
+  
+  const isLmrRelevant = todBand !== 'N/A' || (townCentreBand && townCentreBand !== null);
+
+  if (!isLmrRelevant) {
+    return (
+      <div
+        style={{
+          backgroundColor: "#fef3c7",
+          border: "1px solid #fbbf24",
+          borderRadius: "8px",
+          padding: "0.75rem 1rem",
+          marginTop: "0.5rem"
+        }}
+      >
+        <p style={{ margin: 0, fontSize: BODY_FONT_SIZE, color: "#92400e", fontWeight: 500 }}>
+          <strong>LMR Status:</strong> Not within Low and Mid-Rise (LMR) Transport Oriented Development (TOD) or town centre areas.
+        </p>
+        <p style={{ margin: "0.25rem 0 0", fontSize: BODY_FONT_SIZE, color: "#92400e" }}>
+          LMR uplift options are not available for this address.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        backgroundColor: "#dcfce7",
+        border: "1px solid #16a34a",
+        borderRadius: "8px",
+        padding: "0.75rem 1rem",
+        marginTop: "0.5rem"
+      }}
+    >
+      <p style={{ margin: 0, fontSize: BODY_FONT_SIZE, color: "#166534", fontWeight: 500 }}>
+        <strong>LMR Status:</strong> Within {todBand} band Low and Mid-Rise (LMR) area
+      </p>
+      {todLabel && (
+        <p style={{ margin: "0.25rem 0 0", fontSize: BODY_FONT_SIZE, color: "#166534" }}>
+          {todLabel}
+        </p>
+      )}
+      {townCentreBand && townCentreName && (
+        <p style={{ margin: "0.25rem 0 0", fontSize: BODY_FONT_SIZE, color: "#166534" }}>
+          Town Centre: {townCentreName} ({townCentreBand} band)
+        </p>
+      )}
+      <p style={{ margin: "0.25rem 0 0", fontSize: BODY_FONT_SIZE, color: "#166534" }}>
+        LMR uplift options are available for this address.
+      </p>
+    </div>
+  );
+}
+
 type MapImageryProps = {
   site: PlanningResult['site'];
   mapsReady: boolean;
@@ -1610,6 +1685,9 @@ function MapImagery({ site, mapsReady, mapError }: MapImageryProps) {
         >
           {site.address}
         </p>
+      )}
+      {site.locationalInsights && (
+        <LmrStatusDisplay locationalInsights={site.locationalInsights} />
       )}
       <div
         style={{

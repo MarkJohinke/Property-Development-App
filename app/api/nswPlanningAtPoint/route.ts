@@ -2438,6 +2438,14 @@ export async function GET(request: Request) {
       }
     ];
 
+    // Filter out LMR planning options when they're not relevant to the address
+    const isLmrRelevant = todBand !== 'N/A' || townCentreBand !== 'N/A';
+    const filteredPlanningOptions = isLmrRelevant
+      ? planningOptions
+      : planningOptions.filter(option => 
+          !['lmr-tod', 'lmr-affordable-100', 'lmr-townhouse'].includes(option.slug)
+        );
+
     const comparableSaleSeeds: ComparableSale[] = [
       {
         address: '14 Ocean View Drive, Dee Why NSW 2099',
@@ -2729,7 +2737,7 @@ export async function GET(request: Request) {
         locationalInsights,
         guidelineLinks
       },
-      planningOptions,
+      planningOptions: filteredPlanningOptions,
       recommendations,
       comparableSales,
       developmentActivity,
