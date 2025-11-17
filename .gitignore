@@ -56,3 +56,12 @@ coverage
 *.xls
 *.docx
 *.pdf
+
+# Backup and temporary files
+*.bak
+*.tmp
+*.tmp[0-9]
+*.tmpbackup
+*.swp
+*~
+chunk*.js
