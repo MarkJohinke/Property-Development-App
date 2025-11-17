@@ -920,81 +920,18 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
         margin: "0 auto"
       }}
     >
-      <MapImagery site={site} mapsReady={mapsReady} mapError={mapError} />
+      <MapImagery 
+        site={site} 
+        mapsReady={mapsReady} 
+        mapError={mapError}
+        generatedAtDisplay={generatedAtDisplay}
+        dataSourceSummary={dataSourceSummary}
+      />
 
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            2. Site Data & Zoning Summary
-          </h2>
-          <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
-            Controls sourced from the relevant Local Environmental Plan and NSW Planning Portal
-            datasets. Linked clauses provide authoritative mapping references.
-          </p>
-        </div>
-
-        <div style={{ display: "grid", gap: "1.5rem" }}>
-          <div
-            style={{
-              display: "grid",
-              gap: "0.8rem",
-              gridTemplateColumns: "1fr"
-            }}
-          >
-            {site.metrics.map((metric) => (
-              <article
-                key={metric.id}
-                style={{
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #d0d7de",
-                  borderRadius: "12px",
-                  padding: "1rem",
-                  display: "grid",
-                  gap: "0.45rem"
-                }}
-              >
-                <span style={{ fontSize: BODY_FONT_SIZE, color: "#64748b" }}>{metric.label}</span>
-                <strong style={{ fontSize: "1.1rem", color: "#0f172a" }}>{metric.value}</strong>
-                <a
-                  href={metric.linkUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: BODY_FONT_SIZE }}
-                >
-                  {metric.linkLabel}
-                </a>
-              </article>
-            ))}
-          </div>
-
-          <dl
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: "0.75rem"
-            }}
-          >
-            {siteSummaryEntries(site).map(({ label, value }) => (
-              <div key={label}>
-                <dt style={{ fontWeight: 600, color: "#1f2937" }}>{label}</dt>
-                <dd style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>{value}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-
-        <SourceList heading="Primary datasets" items={site.dataSources} />
-        {generatedAtDisplay && (
-          <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748b" }}>
-            Data captured {generatedAtDisplay} AEST from {dataSourceSummary || "project datasets"}.
-          </p>
-        )}
-      </section>
-
-      <section style={{ display: "grid", gap: "1.25rem" }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            3. Planning Options
+            2. Planning Options
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
             Review available approval pathways. Begin with the status summary table, then dive
@@ -1034,7 +971,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            5. Additional Guidance
+            4. Additional Guidance
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
             Use these action cards to progress the preferred pathway while managing identified
@@ -1063,7 +1000,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            6. Comparable Sales & Development Activity
+            5. Comparable Sales & Development Activity
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
             Comparable evidence and nearby development activity sourced from NSW Planning Portal
@@ -1331,7 +1268,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       </section>
       <section>
         <h2 style={{ marginBottom: "1rem", fontSize: "1.6rem", color: "#0f172a" }}>
-          7. Feasibility Snapshot
+          6. Feasibility Snapshot
         </h2>
         <article
           style={{
@@ -1430,7 +1367,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
 
       <section>
         <h2 style={{ marginBottom: "1rem", fontSize: "1.6rem", color: "#0f172a" }}>
-          8. Technical Glossary
+          7. Technical Glossary
         </h2>
         <article
           style={{
@@ -1482,9 +1419,11 @@ type MapImageryProps = {
   site: PlanningResult['site'];
   mapsReady: boolean;
   mapError: string | null;
+  generatedAtDisplay: string | null;
+  dataSourceSummary: string;
 };
 
-function MapImagery({ site, mapsReady, mapError }: MapImageryProps) {
+function MapImagery({ site, mapsReady, mapError, generatedAtDisplay, dataSourceSummary }: MapImageryProps) {
   const fallbackImage = site.mapPreviewUrl;
   const staticMapUrl = buildStaticMapUrl(site.latitude, site.longitude) ?? fallbackImage;
   const streetViewTarget = site.streetView ?? {
@@ -1590,14 +1529,13 @@ function MapImagery({ site, mapsReady, mapError }: MapImageryProps) {
   }, [canRenderInteractiveMap]);
 
   return (
-    <section style={{ display: "grid", gap: "1rem" }}>
+    <section style={{ display: "grid", gap: "1.25rem" }}>
       <div>
         <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-          1. Site Context
+          1. Site Data
         </h2>
         <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
-          Visualise the parcel immediately after entering the address. Satellite imagery centres on
-          the lot and Street View appears whenever Google coverage is available for the frontage.
+          Site context with satellite imagery and Street View, plus zoning controls sourced from the relevant Local Environmental Plan and NSW Planning Portal datasets.
         </p>
       </div>
       {site.address && (
@@ -1729,6 +1667,63 @@ function MapImagery({ site, mapsReady, mapError }: MapImageryProps) {
       >
         Powered by NSW Planning Portal & Google Maps
       </p>
+      
+      <div style={{ display: "grid", gap: "1.5rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gap: "0.8rem",
+            gridTemplateColumns: "1fr"
+          }}
+        >
+          {site.metrics.map((metric) => (
+            <article
+              key={metric.id}
+              style={{
+                backgroundColor: "#ffffff",
+                border: "1px solid #d0d7de",
+                borderRadius: "12px",
+                padding: "1rem",
+                display: "grid",
+                gap: "0.45rem"
+              }}
+            >
+              <span style={{ fontSize: BODY_FONT_SIZE, color: "#64748b" }}>{metric.label}</span>
+              <strong style={{ fontSize: "1.1rem", color: "#0f172a" }}>{metric.value}</strong>
+              <a
+                href={metric.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: BODY_FONT_SIZE }}
+              >
+                {metric.linkLabel}
+              </a>
+            </article>
+          ))}
+        </div>
+
+        <dl
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: "0.75rem"
+          }}
+        >
+          {siteSummaryEntries(site).map(({ label, value }) => (
+            <div key={label}>
+              <dt style={{ fontWeight: 600, color: "#1f2937" }}>{label}</dt>
+              <dd style={{ margin: 0, color: "#475569", fontSize: BODY_FONT_SIZE }}>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      <SourceList heading="Primary datasets" items={site.dataSources} />
+      {generatedAtDisplay && (
+        <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748b" }}>
+          Data captured {generatedAtDisplay} AEST from {dataSourceSummary || "project datasets"}.
+        </p>
+      )}
       <SourceList heading="Key guidelines" items={site.guidelineLinks} />
     </section>
   );
@@ -1960,7 +1955,7 @@ function RecommendationSummarySection({ summary }: RecommendationSummarySectionP
     <section style={{ display: "grid", gap: "1rem" }}>
       <div>
         <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-          4. Recommendation Summary
+          3. Recommendation Summary
         </h2>
         <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
           Snapshot of the recommended pathway, supporting rationale, and next steps.

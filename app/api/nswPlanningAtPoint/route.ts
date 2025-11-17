@@ -15,8 +15,6 @@ const LOT_SEARCH_ENDPOINT =
   'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/Common/LotSearch/MapServer/0/query';
 const LOT_SEARCH_DATASHEET =
   'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/Common/LotSearch/MapServer';
-const CADASTRE_LOT_ENDPOINT =
-  'https://maps.six.nsw.gov.au/arcgis/rest/services/public/NSW_Cadastre/MapServer/9/query';
 const LAND_ZONING_ENDPOINT =
   'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/ePlanning/Planning_Portal_Principal_Planning/MapServer/19/query';
 const OSRM_ROUTE_ENDPOINT = 'https://router.project-osrm.org/route/v1/driving';
@@ -768,98 +766,6 @@ async function querySeppHousingLayer<T>(
   }
 }
 
-async function fetchCadastreLotArea(
-  latitude?: number,
-  longitude?: number
-): Promise<{
-  lotPlan?: string;
-  geometryAreaSquareMeters: number | null;
-  planLotAreaSquareMeters: number | null;
-} | null> {
-  if (
-    latitude === undefined ||
-    longitude === undefined ||
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude)
-  ) {
-    return null;
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
-
-  try {
-    const params = new URLSearchParams({
-      f: 'json',
-      geometryType: 'esriGeometryPoint',
-      inSR: '4326',
-      spatialRel: 'esriSpatialRelIntersects',
-      returnGeometry: 'true',
-      outFields: 'lotnumber,planlabel,planlotarea,planlotareaunits',
-      maxRecordCountFactor: '2'
-    });
-    params.set('geometry', JSON.stringify({ x: longitude, y: latitude }));
-
-    const response = await fetch(`${CADASTRE_LOT_ENDPOINT}?${params.toString()}`, {
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as {
-      features?: Array<{
-        attributes?: {
-          lotnumber?: string;
-          planlabel?: string;
-          planlotarea?: number;
-          planlotareaunits?: string;
-        };
-        geometry?: { rings?: ArcGisRing[] };
-      }>;
-    };
-
-    const feature = data.features?.[0];
-    if (!feature) {
-      return null;
-    }
-
-    const lotNumber = normaliseArcGisString(
-      feature.attributes?.lotnumber ?? (feature.attributes as Record<string, unknown>)?.LOTNUMBER
-    );
-    const planLabel = normaliseArcGisString(
-      feature.attributes?.planlabel ?? (feature.attributes as Record<string, unknown>)?.PLANLABEL
-    );
-    const lotPlan = lotNumber && planLabel ? `Lot ${lotNumber} ${planLabel}` : planLabel;
-
-    const planLotArea = normalisePlanLotArea(
-      feature.attributes?.planlotarea ?? (feature.attributes as Record<string, unknown>)?.PLANLOTAREA,
-      feature.attributes?.planlotareaunits ??
-        (feature.attributes as Record<string, unknown>)?.PLANLOTAREAUNITS
-    );
-
-    const rings = feature.geometry?.rings;
-    let geometryAreaSquareMeters: number | null = null;
-    if (Array.isArray(rings) && rings.length > 0) {
-      const firstRing = rings[0];
-      const mercatorPoints = firstRing.map(([lon, lat]) => toWebMercator(lon, lat));
-      const candidateArea = computePolygonArea(mercatorPoints);
-      geometryAreaSquareMeters = isFiniteNumber(candidateArea) ? candidateArea : null;
-    }
-
-    return {
-      lotPlan,
-      geometryAreaSquareMeters,
-      planLotAreaSquareMeters: planLotArea
-    };
-  } catch {
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
 function resolveLandArea(candidates: LandAreaCandidate[]): LandAreaResolution {
   if (!Array.isArray(candidates) || candidates.length === 0) {
     return { value: null, status: 'missing', candidates: [] };
@@ -1011,46 +917,6 @@ async function enrichComparableSalesLandArea(
           method: 'manual',
           notes: 'Pre-populated comparable record'
         });
-      }
-
-      const hasCoordinates =
-        sale.latitude !== undefined &&
-        sale.longitude !== undefined &&
-        isFiniteNumber(sale.latitude) &&
-        isFiniteNumber(sale.longitude);
-
-      if (hasCoordinates) {
-        const parcelSummary = await fetchParcelSummary(sale.latitude, sale.longitude);
-        if (parcelSummary) {
-          candidates.push({
-            source: 'Planning Portal – Cadastre Layer',
-            value: parcelSummary.geometryAreaSquareMeters,
-            method: 'geometry',
-            notes: parcelSummary.lotPlan
-          });
-          candidates.push({
-            source: 'Planning Portal – Cadastre Layer',
-            value: parcelSummary.planLotAreaSquareMeters,
-            method: 'attribute',
-            notes: parcelSummary.lotPlan
-          });
-        }
-
-        const cadastreSummary = await fetchCadastreLotArea(sale.latitude, sale.longitude);
-        if (cadastreSummary) {
-          candidates.push({
-            source: 'SIX Maps NSW Cadastre (current parcels)',
-            value: cadastreSummary.geometryAreaSquareMeters,
-            method: 'geometry',
-            notes: cadastreSummary.lotPlan
-          });
-          candidates.push({
-            source: 'SIX Maps NSW Cadastre (current parcels)',
-            value: cadastreSummary.planLotAreaSquareMeters,
-            method: 'attribute',
-            notes: cadastreSummary.lotPlan
-          });
-        }
       }
 
       const resolution = resolveLandArea(candidates);
@@ -1534,20 +1400,18 @@ export async function GET(request: Request) {
       parcelSummary?.centroidLatitude !== undefined &&
       Number.isFinite(parcelSummary.centroidLatitude)
         ? parcelSummary.centroidLatitude
-        : lookupLatitude;
+        : undefined;
     const parcelLongitude =
       parcelSummary?.centroidLongitude !== undefined &&
       Number.isFinite(parcelSummary.centroidLongitude)
         ? parcelSummary.centroidLongitude
-        : lookupLongitude;
+        : undefined;
 
     const mapLatitude = parcelLatitude ?? geocodeLatitude ?? DEFAULT_COORDINATES.latitude;
     const mapLongitude = parcelLongitude ?? geocodeLongitude ?? DEFAULT_COORDINATES.longitude;
 
-    const streetViewLatitude =
-      geocodeLatitude ?? parcelLatitude ?? DEFAULT_COORDINATES.latitude;
-    const streetViewLongitude =
-      geocodeLongitude ?? parcelLongitude ?? DEFAULT_COORDINATES.longitude;
+    const streetViewLatitude = geocodeLatitude ?? parcelLatitude ?? DEFAULT_COORDINATES.latitude;
+    const streetViewLongitude = geocodeLongitude ?? parcelLongitude ?? DEFAULT_COORDINATES.longitude;
 
     const siteMapPreviewUrl = buildFallbackStaticMap(mapLatitude, mapLongitude);
 
