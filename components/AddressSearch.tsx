@@ -387,8 +387,8 @@ const glossaryEntries: Array<{ term: string; definition: string; url?: string }>
   },
   {
     term: "Low and Mid-Rise (LMR)",
-    definition: "NSW Low and Mid-Rise Housing program",
-    url: "https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy"
+    definition: "State Environmental Planning Policy (Housing) 2021 - Chapter 6",
+    url: "https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643#pt.2-div.6"
   },
   {
     term: "National Construction Code (NCC)",
@@ -793,7 +793,13 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
   }, [planningOptions]);
 
   const pricedComparableSales = useMemo(
-    () => comparableSales.filter((sale) => sale.salePrice !== null && sale.salePrice !== undefined),
+    () => comparableSales
+      .filter((sale) => sale.salePrice !== null && sale.salePrice !== undefined)
+      .sort((a, b) => {
+        const aArea = a.landAreaSquareMeters ?? 0;
+        const bArea = b.landAreaSquareMeters ?? 0;
+        return bArea - aArea; // Sort descending by land size
+      }),
     [comparableSales]
   );
 
@@ -925,11 +931,10 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            2. Site Data & Zoning Summary
+            2. Site Data
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
-            Controls sourced from the relevant Local Environmental Plan and NSW Planning Portal
-            datasets. Linked clauses provide authoritative mapping references.
+            Low and Mid-Rise (LMR) site characteristics including lot dimensions, street frontage, and locational context sourced from NSW Planning Portal datasets.
           </p>
         </div>
 
@@ -994,11 +999,10 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            3. Planning Options
+            3. Zoning Summary & Planning Options
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
-            Review available approval pathways. Begin with the status summary table, then dive
-            into each pathway card for controls, evidence, and next steps.
+            Zoning requirements and available approval pathways including Complying Development Certificate (CDC), Development Application (DA), Low and Mid-Rise (LMR), Apartment Design Guide (ADG) Guidelines, Housing Diversity Amendment (HDA), and State Significant Development (SSD). Review Floor Space Ratio (FSR) and Maximum Height Allowances for each pathway.
           </p>
         </div>
 
@@ -1247,7 +1251,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
             <header>
               <h3 style={{ margin: 0, color: "#0f172a" }}>Nearby Development Applications</h3>
               <p style={{ margin: "0.35rem 0 0", color: "#475569", fontSize: BODY_FONT_SIZE }}>
-                Council and state assessed applications signalling appetite for uplift in the area.
+                Council and state assessed applications, including Land and Environment Court findings from the past 2 years, signalling appetite for uplift in the area.
               </p>
             </header>
             <div style={{ display: "grid", gap: "0.85rem" }}>
