@@ -1691,9 +1691,9 @@ export async function GET(request: Request) {
       },
       cdcDuplex: {
         summary:
-          'Front 6 m landscaped setback with side 0.9 m and rear 3 m private open space (Codes SEPP Part 3A baseline).',
+          'Front 6 m landscaped setback with side 0.9 m and rear 3 m private open space (Codes State Environmental Planning Policy Part 3A baseline).',
         source: {
-          label: 'Codes SEPP Part 3A - Dual Occupancies',
+          label: 'Codes State Environmental Planning Policy Part 3A - Dual Occupancies',
           url: CODES_SEPP_PART3A_URL
         },
         requirements: {
@@ -1704,9 +1704,9 @@ export async function GET(request: Request) {
       },
       cdcTerrace: {
         summary:
-          'Front 4.5 m average with side 0.9 m end terrace setback and rear 6 m private open space (Codes SEPP Part 3B baseline).',
+          'Front 4.5 m average with side 0.9 m end terrace setback and rear 6 m private open space (Codes State Environmental Planning Policy Part 3B baseline).',
         source: {
-          label: 'Codes SEPP Part 3B - Low Rise Housing',
+          label: 'Codes State Environmental Planning Policy Part 3B - Low Rise Housing',
           url: CODES_SEPP_PART3B_URL
         },
         requirements: {
@@ -1773,7 +1773,7 @@ export async function GET(request: Request) {
 
     const locationalInsights = await fetchTodInsights(parcelLatitude, parcelLongitude);
     dataSources.push({
-      label: 'SEPP Housing 2021 - Transport Oriented Development mapping',
+      label: 'State Environmental Planning Policy Housing 2021 - Transport Oriented Development mapping',
       url: SEPP_HOUSING_MAPSERVER
     });
 
@@ -1784,11 +1784,11 @@ export async function GET(request: Request) {
         url: legacyPlan.dcpUrl
       },
       {
-        label: 'SEPP (Exempt and Complying Development Codes) 2008',
+        label: 'State Environmental Planning Policy (Exempt and Complying Development Codes) 2008',
         url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572'
       },
       {
-        label: 'SEPP (Housing) 2021',
+        label: 'State Environmental Planning Policy (Housing) 2021',
         url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643'
       },
       {
@@ -1826,15 +1826,15 @@ export async function GET(request: Request) {
     const isTodOuter = todBand === 'Outer';
     const isLmrBand = isTodInner || isTodOuter;
     const lmrImprovementSummary = isLmrBand
-      ? `Housing SEPP Low and Mid-Rise ${todBand.toLowerCase()} band unlocks uplift when Development Applications demonstrate design excellence and frontage >=21 m.`
-      : 'Outside Housing SEPP Low and Mid-Rise mapping. Uplift relies on town centre programs or planning proposals.';
+      ? `Housing State Environmental Planning Policy Low and Mid-Rise ${todBand.toLowerCase()} band unlocks uplift when Development Applications demonstrate design excellence and frontage >=21 m.`
+      : 'Outside Housing State Environmental Planning Policy Low and Mid-Rise mapping. Uplift relies on town centre programs or planning proposals.';
 
     const frontageMetersValue =
       parcelSummary?.streetFrontageMeters ?? parcelSummary?.frontageMeters ?? null;
     const frontageApprox =
       isFiniteNumber(frontageMetersValue) && frontageMetersValue > 0
         ? `${formatMeters(frontageMetersValue)} frontage (approx)`
-        : 'approx. 15 m frontage (Codes SEPP Part 3A minimum)';
+        : 'approx. 15 m frontage (Codes State Environmental Planning Policy Part 3A minimum)';
     const depthMetersValue = parcelSummary?.depthMeters ?? null;
     const depthApprox =
       isFiniteNumber(depthMetersValue) && depthMetersValue > 0
