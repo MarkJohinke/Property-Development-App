@@ -56,3 +56,12 @@ coverage
 *.xls
 *.docx
 *.pdf
+
+# Backup files
+*.bak
+*.tmp
+*.tmp*
+*.tmpbackup
+
+# Build chunk files
+chunk*.js
