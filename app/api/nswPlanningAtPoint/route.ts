@@ -48,6 +48,12 @@ type ArcGisRing = Array<[number, number]>;
 const SEPP_HOUSING_MAPSERVER =
   'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/Planning/SEPP_Housing_2021/MapServer';
 
+const PLANNING_PORTAL_MAPSERVER =
+  'https://mapprod3.environment.nsw.gov.au/arcgis/rest/services/ePlanning/Planning_Portal_Principal_Planning/MapServer';
+const PLANNING_LAYER_FSR = 9;
+const PLANNING_LAYER_HOB = 12;
+const PLANNING_LAYER_MLS = 22;
+
 type LandZoningAttributes = {
   LABEL?: string;
   LAY_CLASS?: string;
@@ -944,7 +950,151 @@ async function fetchLandZoning(
   }
 }
 
+type PlanningLayerResult = {
+  label: string | null;
+  className: string | null;
+  mapName: string | null;
+};
+
+async function queryPlanningLayerLabel(
+  layerId: number,
+  latitude: number,
+  longitude: number
+): Promise<PlanningLayerResult | null> {
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude)
+  ) {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    f: 'json',
+    geometry: `${longitude},${latitude}`,
+    geometryType: 'esriGeometryPoint',
+    inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects',
+    outFields: 'LABEL,LAY_CLASS,MAP_NAME',
+    returnGeometry: 'false'
+  });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch(
+      `${PLANNING_PORTAL_MAPSERVER}/${layerId}/query?${params.toString()}`,
+      { signal: controller.signal, cache: 'no-store' }
+    );
+    if (!response.ok) {
+      return null;
+    }
+    const json = (await response.json()) as {
+      features?: Array<{ attributes?: { LABEL?: string; LAY_CLASS?: string; MAP_NAME?: string } }>;
+    };
+    const attributes = json.features?.[0]?.attributes;
+    if (!attributes) {
+      return null;
+    }
+    return {
+      label: attributes.LABEL ?? null,
+      className: attributes.LAY_CLASS ?? null,
+      mapName: attributes.MAP_NAME ?? null
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchFsrAtPoint(
+  latitude: number,
+  longitude: number
+): Promise<string | null> {
+  const result = await queryPlanningLayerLabel(PLANNING_LAYER_FSR, latitude, longitude);
+  return result?.label ?? null;
+}
+
+async function fetchHeightAtPoint(
+  latitude: number,
+  longitude: number
+): Promise<string | null> {
+  const result = await queryPlanningLayerLabel(PLANNING_LAYER_HOB, latitude, longitude);
+  if (!result?.label) {
+    return null;
+  }
+  const label = result.label;
+  const numericMatch = label.match(/^(\d+(?:\.\d+)?)/);
+  if (numericMatch) {
+    return `${numericMatch[1]} metres`;
+  }
+  return label;
+}
+
+async function fetchLotSizeAtPoint(
+  latitude: number,
+  longitude: number
+): Promise<string | null> {
+  const result = await queryPlanningLayerLabel(PLANNING_LAYER_MLS, latitude, longitude);
+  if (!result?.label) {
+    return null;
+  }
+  const label = result.label;
+  const numericMatch = label.match(/^(\d+(?:\.\d+)?)/);
+  if (numericMatch) {
+    return `${numericMatch[1]} square metres`;
+  }
+  return label;
+}
+
 async function geocodeAddress(address: string): Promise<GeocodeResult> {
+  const geocodingApiKey = process.env.GEOCODING_API_KEY;
+
+  if (geocodingApiKey) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const params = new URLSearchParams({
+        address: address,
+        key: geocodingApiKey
+      });
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?${params.toString()}`;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        cache: 'no-store'
+      });
+
+      if (response.ok) {
+        const json = (await response.json()) as {
+          status?: string;
+          results?: Array<{
+            geometry?: {
+              location?: { lat?: number; lng?: number };
+            };
+          }>;
+        };
+
+        if (json.status === 'OK' && json.results && json.results.length > 0) {
+          const location = json.results[0].geometry?.location;
+          if (location?.lat !== undefined && location?.lng !== undefined) {
+            const latitude = location.lat;
+            const longitude = location.lng;
+            if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+              const mapPreviewUrl = buildFallbackStaticMap(latitude, longitude);
+              return { latitude, longitude, mapPreviewUrl };
+            }
+          }
+        }
+      }
+    } catch {
+      // Fall through to Nominatim
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
 
@@ -1236,6 +1386,15 @@ export async function GET(request: Request) {
     const leftBoundaryValue = parcelSummary?.leftBoundaryMeters ?? null;
     const rightBoundaryValue = parcelSummary?.rightBoundaryMeters ?? null;
 
+    const controlLatitude = parcelLatitude ?? lookupLatitude;
+    const controlLongitude = parcelLongitude ?? lookupLongitude;
+
+    const [floorSpaceRatioValue, heightOfBuildingsValue, minLotSizeValue] = await Promise.all([
+      fetchFsrAtPoint(controlLatitude, controlLongitude),
+      fetchHeightAtPoint(controlLatitude, controlLongitude),
+      fetchLotSizeAtPoint(controlLatitude, controlLongitude)
+    ]);
+
     metrics.push(
       {
         id: 'zoning',
@@ -1247,23 +1406,23 @@ export async function GET(request: Request) {
       {
         id: 'height',
         label: 'Height of Buildings (HOB)',
-        value: '8.5 metres',
-        linkLabel: `${legacyPlan.lepName} - Height of Buildings Map`,
-        linkUrl: lepUrl(legacyPlan.heightSchedule)
+        value: heightOfBuildingsValue ?? 'Not mapped',
+        linkLabel: `NSW Planning Portal - Height of Buildings (Layer ${PLANNING_LAYER_HOB})`,
+        linkUrl: `${PLANNING_PORTAL_MAPSERVER}/${PLANNING_LAYER_HOB}`
       },
       {
         id: 'fsr',
         label: 'Floor Space Ratio (FSR)',
-        value: '0.5:1',
-        linkLabel: `${legacyPlan.lepName} - Floor Space Ratio Map`,
-        linkUrl: lepUrl(legacyPlan.fsrSchedule)
+        value: floorSpaceRatioValue ?? 'Not mapped',
+        linkLabel: `NSW Planning Portal - Floor Space Ratio (Layer ${PLANNING_LAYER_FSR})`,
+        linkUrl: `${PLANNING_PORTAL_MAPSERVER}/${PLANNING_LAYER_FSR}`
       },
       {
         id: 'lot',
         label: 'Minimum Lot Size',
-        value: '600 square metres',
-        linkLabel: `${legacyPlan.lepName} - Lot Size Map`,
-        linkUrl: lepUrl(legacyPlan.lotSizeSchedule)
+        value: minLotSizeValue ?? 'Not mapped',
+        linkLabel: `NSW Planning Portal - Minimum Lot Size (Layer ${PLANNING_LAYER_MLS})`,
+        linkUrl: `${PLANNING_PORTAL_MAPSERVER}/${PLANNING_LAYER_MLS}`
       }
     );
 
@@ -1384,30 +1543,28 @@ export async function GET(request: Request) {
       }
     ];
 
-    // Determine FSR from zoning if available, otherwise use null
-    const floorSpaceRatio = zoningInfo?.label && zoningInfo.label.includes('0.5:1') ? '0.5:1' : null;
-
     const generatedAt = new Date().toISOString();
 
-    // Build capabilities object showing which data domains succeeded
     const capabilities = {
       geocode: geocodeLatitude !== undefined && geocodeLongitude !== undefined,
       parcel: parcelSummary !== null,
       zoning: zoningInfo !== null,
       todInsights: locationalInsights !== null,
-      streetView: streetViewAvailable
+      streetView: streetViewAvailable,
+      fsr: floorSpaceRatioValue !== null,
+      height: heightOfBuildingsValue !== null,
+      lotSize: minLotSizeValue !== null
     };
 
-    // Prepare the lean response with only live data
     const responseData = {
       site: {
         address,
         lotPlan: parcelSummary?.lotPlan ?? null,
         localGovernmentArea: 'Northern Beaches Council',
         zoning: zoneDisplayName,
-        floorSpaceRatio: floorSpaceRatio ?? '0.5:1',
-        heightOfBuildings: '8.5 metres',
-        minLotSize: '600 square metres',
+        floorSpaceRatio: floorSpaceRatioValue,
+        heightOfBuildings: heightOfBuildingsValue,
+        minLotSize: minLotSizeValue,
         latitude: mapLatitude,
         longitude: mapLongitude,
         mapPreviewUrl: siteMapPreviewUrl,
