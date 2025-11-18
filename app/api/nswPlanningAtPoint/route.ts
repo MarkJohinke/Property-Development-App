@@ -1829,6 +1829,38 @@ export async function GET(request: Request) {
       ? `Housing State Environmental Planning Policies Low and Mid-Rise ${todBand.toLowerCase()} band unlocks uplift when Development Applications demonstrate design excellence and frontage >=21 m.`
       : 'Outside Housing State Environmental Planning Policies Low and Mid-Rise mapping. Uplift relies on town centre programs or planning proposals.';
 
+    // Add LMR-specific metrics to Site Data (address-specific Transport Oriented Development information)
+    if (todBand !== 'N/A') {
+      metrics.push({
+        id: 'tod-band',
+        label: 'Transport Oriented Development (TOD) Band',
+        value: `${todBand} (${todLabel})`,
+        linkLabel: 'Housing State Environmental Planning Policies Part 2 Div 4',
+        linkUrl: HOUSING_SEPP_LMR_URL
+      });
+    }
+
+    if (townCentreBand !== 'N/A' && townCentreName) {
+      metrics.push({
+        id: 'town-centre-band',
+        label: 'Town Centre Band',
+        value: `${townCentreBand} band for ${townCentreName}`,
+        linkLabel: 'Housing State Environmental Planning Policies Town Centre Provisions',
+        linkUrl: HOUSING_SEPP_TOWN_CENTRE_URL
+      });
+    }
+
+    // Add LMR uplift status if applicable
+    if (isLmrBand) {
+      metrics.push({
+        id: 'lmr-status',
+        label: 'Low and Mid-Rise (LMR) Status',
+        value: 'Uplift available - subject to design excellence and frontage >=21m',
+        linkLabel: 'Housing State Environmental Planning Policies Part 2 Div 4',
+        linkUrl: HOUSING_SEPP_LMR_URL
+      });
+    }
+
     const frontageMetersValue =
       parcelSummary?.streetFrontageMeters ?? parcelSummary?.frontageMeters ?? null;
     const frontageApprox =
