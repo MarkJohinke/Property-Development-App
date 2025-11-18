@@ -387,8 +387,8 @@ const glossaryEntries: Array<{ term: string; definition: string; url?: string }>
   },
   {
     term: "Low and Mid-Rise (LMR)",
-    definition: "NSW Low and Mid-Rise Housing program",
-    url: "https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy"
+    definition: "State Environmental Planning Policy (Housing) 2021 - Chapter 6",
+    url: "https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643#pt.2-div.6"
   },
   {
     term: "National Construction Code (NCC)",
@@ -396,7 +396,7 @@ const glossaryEntries: Array<{ term: string; definition: string; url?: string }>
     url: "https://www.abcb.gov.au/national-construction-code"
   },
   {
-    term: "SEPP",
+    term: "State Environmental Planning Policy (SEPP)",
     definition: "State Environmental Planning Policy",
     url: "https://www.planning.nsw.gov.au/policy-and-legislation/state-environmental-planning-policies"
   },
@@ -793,7 +793,20 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
   }, [planningOptions]);
 
   const pricedComparableSales = useMemo(
-    () => comparableSales.filter((sale) => sale.salePrice !== null && sale.salePrice !== undefined),
+    () => comparableSales
+      .filter((sale) => sale.salePrice !== null && sale.salePrice !== undefined)
+      .sort((a, b) => {
+        // Sort by land area in descending order (largest first)
+        // Put sales with missing land area at the end
+        const areaA = a.landAreaSquareMeters ?? -1;
+        const areaB = b.landAreaSquareMeters ?? -1;
+        
+        if (areaA === -1 && areaB === -1) return 0;
+        if (areaA === -1) return 1;
+        if (areaB === -1) return -1;
+        
+        return areaB - areaA;
+      }),
     [comparableSales]
   );
 
@@ -925,11 +938,11 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            2. Site Data & Zoning Summary
+            2. Site Data
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
-            Controls sourced from the relevant Local Environmental Plan and NSW Planning Portal
-            datasets. Linked clauses provide authoritative mapping references.
+            Site dimensions and characteristics including LMR (Low and Mid-Rise) characteristics for the site. 
+            Data sourced from NSW Planning Portal datasets and cadastral information.
           </p>
         </div>
 
@@ -941,7 +954,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
               gridTemplateColumns: "1fr"
             }}
           >
-            {site.metrics.map((metric) => (
+            {site.metrics.filter(m => !['zoning', 'height', 'fsr', 'lot'].includes(m.id)).map((metric) => (
               <article
                 key={metric.id}
                 style={{
@@ -994,12 +1007,49 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
       <section style={{ display: "grid", gap: "1.25rem" }}>
         <div>
           <h2 style={{ margin: 0, fontSize: "1.6rem", color: "#0f172a" }}>
-            3. Planning Options
+            3. Zoning Summary & Planning Options
           </h2>
           <p style={{ margin: "0.35rem 0 0", color: "#475569", lineHeight: 1.6, fontSize: BODY_FONT_SIZE }}>
-            Review available approval pathways. Begin with the status summary table, then dive
-            into each pathway card for controls, evidence, and next steps.
+            Zoning controls and planning requirements including CDC (Complying Development Certificate), 
+            DA (Development Application), LMR (Low and Mid-Rise), ADG (Apartment Design Guide), 
+            HDA (Housing Diversity Amendment), and SSD (State Significant Development) pathways. 
+            Controls sourced from the relevant Local Environmental Plan and NSW Planning Portal datasets.
           </p>
+        </div>
+
+        <div style={{ display: "grid", gap: "1.5rem" }}>
+          <div
+            style={{
+              display: "grid",
+              gap: "0.8rem",
+              gridTemplateColumns: "1fr"
+            }}
+          >
+            {site.metrics.filter(m => ['zoning', 'height', 'fsr', 'lot'].includes(m.id)).map((metric) => (
+              <article
+                key={metric.id}
+                style={{
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #d0d7de",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  display: "grid",
+                  gap: "0.45rem"
+                }}
+              >
+                <span style={{ fontSize: BODY_FONT_SIZE, color: "#64748b" }}>{metric.label}</span>
+                <strong style={{ fontSize: "1.1rem", color: "#0f172a" }}>{metric.value}</strong>
+                <a
+                  href={metric.linkUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: BODY_FONT_SIZE }}
+                >
+                  {metric.linkLabel}
+                </a>
+              </article>
+            ))}
+          </div>
         </div>
 
         <PlanningOptionSummaryTable options={planningOptions} />
@@ -1025,7 +1075,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
         {generatedAtDisplay && (
           <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748b" }}>
             Planning pathway data captured {generatedAtDisplay} AEST. Sources include NSW Housing
-            SEPP datasets and listed clauses.
+            State Environmental Planning Policy datasets and listed clauses.
           </p>
         )}
       </section>
@@ -1247,7 +1297,8 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
             <header>
               <h3 style={{ margin: 0, color: "#0f172a" }}>Nearby Development Applications</h3>
               <p style={{ margin: "0.35rem 0 0", color: "#475569", fontSize: BODY_FONT_SIZE }}>
-                Council and state assessed applications signalling appetite for uplift in the area.
+                Council and state assessed applications signalling appetite for uplift in the area. 
+                Includes Land and Environment Court findings from the past 2 years.
               </p>
             </header>
             <div style={{ display: "grid", gap: "0.85rem" }}>
