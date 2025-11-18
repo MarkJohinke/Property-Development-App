@@ -1,15 +1,16 @@
 # Property Development Analysis Tool
 
-This workspace hosts a Next.js 14 application that helps Johinke Development analyse New South Wales properties by aggregating zoning, Transport Oriented Development (TOD) insights, feasibility metrics, and comparable sales into a single site report. The UI is tailored for desktop stakeholders and is backed by a serverless API route that stitches together open-government ArcGIS datasets and Google services.
+This workspace hosts a Next.js 15 application with FastAPI backend that helps Johinke Development analyse New South Wales properties by aggregating zoning, Transport Oriented Development (TOD) insights, Land & Environmental Court decisions, and planning data into a single site report.
 
 ## Current Status
-- Frontend address search and reporting experience is implemented in `components/AddressSearch.tsx:1` as a large client component with Google Places autocomplete, fallbacks for when Maps fails to load, and rich report rendering (maps, tables, recommendations, glossary).
-- The landing page simply wraps the search UI and presents marketing copy from `app/page.tsx:1`; shared layout is defined in `app/layout.tsx:1`.
-- Data is sourced through the Next.js Route Handler at `app/api/nswPlanningAtPoint/route.ts:1`, which currently performs live lookups (Nominatim geocoding, NSW LotSearch, SEPP Housing layers, Google Street View metadata) but ultimately returns a curated sample payload that blends remote signals with mocked feasibility figures.
-- Google Maps JavaScript API loading is centralised in `lib/googleMaps.ts:1` to avoid duplicate initialisation and to support library switching.
-- A legacy `backend/` directory remains with only environment placeholders (`backend/.env.example:1`); the FastAPI service referenced in `AGENTS.md:1` is not present.
-- Build artefacts such as `.next/` and `chunk471.js:1` are checked in; clean/rebuild when packaging.
-- Link integrity checks from `hyperlink_check_results.csv:1` confirm NSW planning references were reachable during the last audit.
+- **Frontend**: Next.js 15 application with address search and comprehensive property reporting
+- **Backend**: FastAPI service providing planning data APIs including:
+  - Land zoning information from NSW ArcGIS services
+  - Planning controls (FSR, height, lot size)
+  - Land & Environmental Court (LEC) findings within 5km radius with Clause 4.6 variations
+- **Maps**: Google Maps API integration with OpenStreetMap fallback
+- **Data Sources**: Live lookups from Nominatim geocoding, NSW LotSearch, SEPP Housing layers, Google Street View
+- **Note**: Some data (comparable sales, feasibility) still uses sample data pending full API integration
 
 ## Workspace Layout
 ```
@@ -25,23 +26,109 @@ property-dev-app/
 ```
 
 ## Getting Started
-1. Install Node.js 18+ (align with Next.js 14 requirements).
-2. Install dependencies: `npm install`.
-3. Copy `.env.local` (or use `backend/.env.example:1` as a pattern) and provide values listed below.
-4. Run the dev server: `npm run dev` (served on `http://localhost:3000`).
-5. Lint before committing: `npm run lint`. Build for production with `npm run build` followed by `npm run start`.
+
+### Option 1: Docker Compose (Recommended)
+Run both backend and frontend together:
+```bash
+docker compose up
+```
+- Backend: http://localhost:8000
+- Frontend: http://localhost:3000
+- API Docs: http://localhost:8000/docs
+
+### Option 2: Local Development
+
+#### Backend Setup
+1. Install Python 3.11+
+2. Create and activate virtual environment:
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Copy `.env.example` to `.env` and configure
+5. Run backend:
+   ```bash
+   uvicorn app.main:app --reload --port 8000
+   ```
+6. Run tests:
+   ```bash
+   pytest -v
+   ```
+
+#### Frontend Setup
+1. Install Node.js 18+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Copy `.env.local.example` to `.env.local` and configure Google Maps API key (optional)
+4. Run dev server:
+   ```bash
+   npm run dev
+   ```
+   Served on http://localhost:3000
+5. Lint and build:
+   ```bash
+   npm run lint
+   npm run build
+   npm run start
+   ```
 
 ## Environment Variables
-| Variable | Location | Purpose |
+
+### Frontend (`.env.local`)
+| Variable | Required | Purpose |
 | --- | --- | --- |
-| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | `.env.local:1` | Loads the Google Maps JavaScript API for autocomplete, maps, and Street View. Required for full functionality. |
+| `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | Optional | Google Maps JavaScript API for autocomplete, maps, and Street View. Falls back to OpenStreetMap if not provided. |
+| `NEXT_PUBLIC_API_URL` | Optional | Backend API URL (defaults to Next.js API routes) |
+
+**Getting a Google Maps API Key:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/google/maps-apis)
+2. Create a new project or select existing
+3. Enable these APIs:
+   - Maps JavaScript API
+   - Places API
+   - Street View Static API
+   - Maps Static API
+4. Create credentials (API Key)
+5. Add to `.env.local`
+
+### Backend (`backend/.env`)
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `ENVIRONMENT` | No | Environment name (development/staging/production) |
+| `CORS_ORIGINS` | No | Comma-separated allowed origins (default: localhost:3000) |
+| `GEOCODE_USER_AGENT` | No | User agent for geocoding requests |
+| `NSW_PLANNING_ARCGIS_URL` | No | NSW Planning ArcGIS service URL |
 
 ## External Services & Data Sources
-- **Google Maps Platform**: Places Autocomplete (`components/AddressSearch.tsx:1`), Maps JS API and Street View metadata checks (`lib/googleMaps.ts:1`, `app/api/nswPlanningAtPoint/route.ts:1`).
-- **OpenStreetMap / Nominatim**: Geocoding fallback when no parcel centroid is available (`app/api/nswPlanningAtPoint/route.ts:1`).
-- **NSW Government ArcGIS services**: Lot dimensions, zoning labels, SEPP Housing layers, town centre polygons (`app/api/nswPlanningAtPoint/route.ts:1`).
-- **OSRM**: Routing metadata reserved for future travel-time calculations (`app/api/nswPlanningAtPoint/route.ts:1`).
-- **Planning legislation PDFs/URLs**: Linked throughout the rendered report and validated via `hyperlink_check_results.csv:1`.
+- **Google Maps Platform**: Places Autocomplete, Maps JS API, Street View (optional, with OpenStreetMap fallback)
+- **OpenStreetMap / Nominatim**: Geocoding fallback and static maps when Google Maps unavailable
+- **NSW Government ArcGIS services**: Lot dimensions, zoning labels, SEPP Housing layers, town centre polygons
+- **OSRM**: Routing metadata for travel-time calculations
+- **NSW Caselaw (planned)**: Land & Environmental Court decisions and Clause 4.6 variations
+- **Planning legislation PDFs/URLs**: Linked throughout reports
+
+## API Endpoints
+
+### Backend API
+The FastAPI backend provides these endpoints:
+
+#### Health & Status
+- `GET /health` - Health check
+- `GET /api/status` - Service status and configuration
+
+#### Planning Data
+- `GET /api/planning/zoning?latitude={lat}&longitude={lon}` - Get land zoning information
+- `GET /api/planning/controls?latitude={lat}&longitude={lon}` - Get FSR, height, lot size controls
+- `GET /api/planning/lec-findings?latitude={lat}&longitude={lon}&radius_km=5&years_back=2` - Get Land & Environmental Court findings within radius
+
+**Interactive API Documentation:** Visit http://localhost:8000/docs when backend is running
 
 ## Development Notes & Next Steps
 - Break down `components/AddressSearch.tsx:1` into focused subcomponents/hooks to improve maintainability and enable testing.

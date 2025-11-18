@@ -56,3 +56,31 @@ coverage
 *.xls
 *.docx
 *.pdf
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/**/.pytest_cache/
+backend/htmlcov/
+backend/.coverage
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.tmp2
+*.tmpbackup
+
+# Keep example env files
+!.env.example
+!.env.local.example
+!backend/.env.example
