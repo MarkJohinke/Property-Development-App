@@ -56,3 +56,10 @@ coverage
 *.xls
 *.docx
 *.pdf
+
+# Temporary/backup files
+*.tmp
+*.tmp[0-9]*
+*.bak
+*.backup
+*~

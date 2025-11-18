@@ -915,7 +915,7 @@ function ResultDisplay({ result, mapsReady, mapError }: ResultDisplayProps) {
         display: "grid",
         gap: "2.5rem",
         backgroundColor: "#f8fafc",
-        maxWidth: "1200px",
+        maxWidth: "2400px",
         width: "100%",
         margin: "0 auto"
       }}

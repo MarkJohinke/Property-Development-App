@@ -1691,9 +1691,9 @@ export async function GET(request: Request) {
       },
       cdcDuplex: {
         summary:
-          'Front 6 m landscaped setback with side 0.9 m and rear 3 m private open space (Codes SEPP Part 3A baseline).',
+          'Front 6 m landscaped setback with side 0.9 m and rear 3 m private open space (Codes State Environmental Planning Policies Part 3A baseline).',
         source: {
-          label: 'Codes SEPP Part 3A - Dual Occupancies',
+          label: 'Codes State Environmental Planning Policies Part 3A - Dual Occupancies',
           url: CODES_SEPP_PART3A_URL
         },
         requirements: {
@@ -1704,9 +1704,9 @@ export async function GET(request: Request) {
       },
       cdcTerrace: {
         summary:
-          'Front 4.5 m average with side 0.9 m end terrace setback and rear 6 m private open space (Codes SEPP Part 3B baseline).',
+          'Front 4.5 m average with side 0.9 m end terrace setback and rear 6 m private open space (Codes State Environmental Planning Policies Part 3B baseline).',
         source: {
-          label: 'Codes SEPP Part 3B - Low Rise Housing',
+          label: 'Codes State Environmental Planning Policies Part 3B - Low Rise Housing',
           url: CODES_SEPP_PART3B_URL
         },
         requirements: {
@@ -1773,7 +1773,7 @@ export async function GET(request: Request) {
 
     const locationalInsights = await fetchTodInsights(parcelLatitude, parcelLongitude);
     dataSources.push({
-      label: 'SEPP Housing 2021 - Transport Oriented Development mapping',
+      label: 'State Environmental Planning Policies Housing 2021 - Transport Oriented Development mapping',
       url: SEPP_HOUSING_MAPSERVER
     });
 
@@ -1784,11 +1784,11 @@ export async function GET(request: Request) {
         url: legacyPlan.dcpUrl
       },
       {
-        label: 'SEPP (Exempt and Complying Development Codes) 2008',
+        label: 'State Environmental Planning Policies (Exempt and Complying Development Codes) 2008',
         url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572'
       },
       {
-        label: 'SEPP (Housing) 2021',
+        label: 'State Environmental Planning Policies (Housing) 2021',
         url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643'
       },
       {
@@ -1826,15 +1826,47 @@ export async function GET(request: Request) {
     const isTodOuter = todBand === 'Outer';
     const isLmrBand = isTodInner || isTodOuter;
     const lmrImprovementSummary = isLmrBand
-      ? `Housing SEPP Low and Mid-Rise ${todBand.toLowerCase()} band unlocks uplift when Development Applications demonstrate design excellence and frontage >=21 m.`
-      : 'Outside Housing SEPP Low and Mid-Rise mapping. Uplift relies on town centre programs or planning proposals.';
+      ? `Housing State Environmental Planning Policies Low and Mid-Rise ${todBand.toLowerCase()} band unlocks uplift when Development Applications demonstrate design excellence and frontage >=21 m.`
+      : 'Outside Housing State Environmental Planning Policies Low and Mid-Rise mapping. Uplift relies on town centre programs or planning proposals.';
+
+    // Add LMR-specific metrics to Site Data (address-specific Transport Oriented Development information)
+    if (todBand !== 'N/A') {
+      metrics.push({
+        id: 'tod-band',
+        label: 'Transport Oriented Development (TOD) Band',
+        value: `${todBand} (${todLabel})`,
+        linkLabel: 'Housing State Environmental Planning Policies Part 2 Div 4',
+        linkUrl: HOUSING_SEPP_LMR_URL
+      });
+    }
+
+    if (townCentreBand !== 'N/A' && townCentreName) {
+      metrics.push({
+        id: 'town-centre-band',
+        label: 'Town Centre Band',
+        value: `${townCentreBand} band for ${townCentreName}`,
+        linkLabel: 'Housing State Environmental Planning Policies Town Centre Provisions',
+        linkUrl: HOUSING_SEPP_TOWN_CENTRE_URL
+      });
+    }
+
+    // Add LMR uplift status if applicable
+    if (isLmrBand) {
+      metrics.push({
+        id: 'lmr-status',
+        label: 'Low and Mid-Rise (LMR) Status',
+        value: 'Uplift available - subject to design excellence and frontage >=21m',
+        linkLabel: 'Housing State Environmental Planning Policies Part 2 Div 4',
+        linkUrl: HOUSING_SEPP_LMR_URL
+      });
+    }
 
     const frontageMetersValue =
       parcelSummary?.streetFrontageMeters ?? parcelSummary?.frontageMeters ?? null;
     const frontageApprox =
       isFiniteNumber(frontageMetersValue) && frontageMetersValue > 0
         ? `${formatMeters(frontageMetersValue)} frontage (approx)`
-        : 'approx. 15 m frontage (Codes SEPP Part 3A minimum)';
+        : 'approx. 15 m frontage (Codes State Environmental Planning Policies Part 3A minimum)';
     const depthMetersValue = parcelSummary?.depthMeters ?? null;
     const depthApprox =
       isFiniteNumber(depthMetersValue) && depthMetersValue > 0
@@ -1847,24 +1879,24 @@ export async function GET(request: Request) {
 
     const lmrContextSummary =
       todBand !== 'N/A'
-        ? `${todBand} Transport Oriented Development (TOD) band (${todLabel}) identified in Housing SEPP (Feb 2025).`
+        ? `${todBand} Transport Oriented Development (TOD) band (${todLabel}) identified in Housing State Environmental Planning Policies (Feb 2025).`
         : townCentreBand !== 'N/A'
-          ? `${townCentreBand} band for ${townCentreName} under Housing SEPP town centre mapping.`
+          ? `${townCentreBand} band for ${townCentreName} under Housing State Environmental Planning Policies town centre mapping.`
           : 'Outside February 2025 Transport Oriented Development and town centre release areas.';
 
     const lmrZoneCompatibility =
       todBand !== 'N/A'
-        ? 'Housing SEPP Low and Mid-Rise controls apply with design excellence, frontage >=21 m, deep soil and active transport upgrades.'
+        ? 'Housing State Environmental Planning Policies Low and Mid-Rise controls apply with design excellence, frontage >=21 m, deep soil and active transport upgrades.'
         : townCentreBand !== 'N/A'
           ? `Town centre ${townCentreBand.toLowerCase()} band enables low/mid-rise housing with frontage >=21 m, ADG compliance, and public domain uplift.`
-          : 'Apartments require a planning proposal or rezoning to secure Housing SEPP Low and Mid-Rise (LMR) mapping before progressing.';
+          : 'Apartments require a planning proposal or rezoning to secure Housing State Environmental Planning Policies Low and Mid-Rise (LMR) mapping before progressing.';
 
     const todNextStep =
       todBand !== 'N/A'
         ? 'Engage the NSW Planning Transport Oriented Development (TOD) delivery program to confirm frontage, infrastructure, and design excellence milestones.'
         : townCentreBand !== 'N/A'
           ? `Confirm ${townCentreBand.toLowerCase()} band requirements for ${townCentreName}, including parking, deep soil, and ADG compliance.`
-          : 'Monitor Housing SEPP updates and prepare a planning proposal to unlock Transport Oriented Development (TOD) or town centre uplift.';
+          : 'Monitor Housing State Environmental Planning Policies updates and prepare a planning proposal to unlock Transport Oriented Development (TOD) or town centre uplift.';
 
     const townCentreSummary =
       nearestTownCentre
@@ -1873,11 +1905,11 @@ export async function GET(request: Request) {
 
     const todNonDiscretionaryNote =
       isLmrBand
-        ? 'Housing SEPP non-discretionary standards apply to inner/outer Transport Oriented Development bands (frontage >=21 m, height 13 m baseline, deep soil and active transport thresholds).'
+        ? 'Housing State Environmental Planning Policies non-discretionary standards apply to inner/outer Transport Oriented Development bands (frontage >=21 m, height 13 m baseline, deep soil and active transport thresholds).'
         : null;
     const townCentreNonDiscretionaryNote =
       townCentreBand !== 'N/A'
-        ? 'Housing SEPP town centre non-discretionary standards apply to mapped inner/outer bands once frontage >=21 m and design excellence benchmarks are satisfied.'
+        ? 'Housing State Environmental Planning Policies town centre non-discretionary standards apply to mapped inner/outer bands once frontage >=21 m and design excellence benchmarks are satisfied.'
         : null;
 
     const planningOptions = [
@@ -1889,20 +1921,20 @@ export async function GET(request: Request) {
         permissibility:
           todBand === 'N/A'
             ? 'Outside Transport Oriented Development mapping'
-            : `Housing SEPP Transport Oriented Development (TOD) ${todBand.toLowerCase()} band (${todLabel})`,
+            : `Housing State Environmental Planning Policies Transport Oriented Development (TOD) ${todBand.toLowerCase()} band (${todLabel})`,
         isPermitted: todBand !== 'N/A',
         rationale:
           todBand === 'N/A'
-            ? 'Transport Oriented Development (TOD) uplift is not available until Housing SEPP mapping commences or a planning proposal is progressed.'
-            : 'Housing SEPP Transport Oriented Development (TOD) mapping enables low and mid-rise apartments subject to frontage, design excellence, and infrastructure upgrades.',
+            ? 'Transport Oriented Development (TOD) uplift is not available until Housing State Environmental Planning Policies mapping commences or a planning proposal is progressed.'
+            : 'Housing State Environmental Planning Policies Transport Oriented Development (TOD) mapping enables low and mid-rise apartments subject to frontage, design excellence, and infrastructure upgrades.',
         zoneCompatibility: lmrZoneCompatibility,
         governingFactors: [
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Transport Oriented Development (TOD) label', value: todLabel, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Frontage', value: '>=21 m (Housing SEPP Transport Oriented Development (TOD) baseline)', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Floor Space Ratio (FSR) baseline', value: '1.0:1 (Housing SEPP draft control)', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Height baseline', value: '13 m (4 storeys) prior to bonuses', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Transport Oriented Development (TOD) label', value: todLabel, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Frontage', value: '>=21 m (Housing State Environmental Planning Policies Transport Oriented Development (TOD) baseline)', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Floor Space Ratio (FSR) baseline', value: '1.0:1 (Housing State Environmental Planning Policies draft control)', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Height baseline', value: '13 m (4 storeys) prior to bonuses', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'Minimum lot size', value: areaApprox, source: { label: `${legacyPlan.lepName} - Lot Size Map`, url: lepUrl(legacyPlan.lotSizeSchedule) } }
         ],
         setbacks: setbacks.apartment,
@@ -1924,7 +1956,7 @@ export async function GET(request: Request) {
             label: 'Infill affordable housing bonus',
             fsr: 'Up to 1.15:1',
             height: '16 m',
-            trigger: 'Deliver >=15% infill affordable dwellings under Housing SEPP Part 2 Division 4.'
+            trigger: 'Deliver >=15% infill affordable dwellings under Housing State Environmental Planning Policies Part 2 Division 4.'
           }
         ],
         notes: [
@@ -1936,7 +1968,7 @@ export async function GET(request: Request) {
         ],
         clauses: [
           {
-            label: 'Housing SEPP 2021 - Part 2 Division 4 Low and Mid-Rise Housing',
+            label: 'Housing State Environmental Planning Policies 2021 - Part 2 Division 4 Low and Mid-Rise Housing',
             url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643#pt.2-div.4'
           },
           {
@@ -1952,24 +1984,24 @@ export async function GET(request: Request) {
         status: isLmrBand ? 'permitted' : townCentreBand !== 'N/A' ? 'conditional' : 'prohibited',
         permissibility:
           todBand !== 'N/A'
-            ? `Housing SEPP Transport Oriented Development (TOD) ${todBand.toLowerCase()} band – 100% affordable`
+            ? `Housing State Environmental Planning Policies Transport Oriented Development (TOD) ${todBand.toLowerCase()} band – 100% affordable`
             : townCentreBand !== 'N/A'
-              ? `Housing SEPP town centre ${townCentreBand.toLowerCase()} band – 100% affordable`
-              : 'Requires rezoning or Housing SEPP pathway for 100% affordable housing',
+              ? `Housing State Environmental Planning Policies town centre ${townCentreBand.toLowerCase()} band – 100% affordable`
+              : 'Requires rezoning or Housing State Environmental Planning Policies pathway for 100% affordable housing',
         isPermitted: isLmrBand || townCentreBand !== 'N/A',
         rationale:
-          'Housing SEPP enables additional uplift where the development is 100% affordable housing managed by a registered community housing provider.',
+          'Housing State Environmental Planning Policies enables additional uplift where the development is 100% affordable housing managed by a registered community housing provider.',
         zoneCompatibility:
           isLmrBand || townCentreBand !== 'N/A'
             ? 'Eligible within Transport Oriented Development (TOD) or town centre bands subject to frontage, tenure, and design excellence.'
-            : 'Outside mapped uplift areas a planning proposal or SEPP amendment is required.',
+            : 'Outside mapped uplift areas a planning proposal or State Environmental Planning Policies amendment is required.',
         governingFactors: [
-          { label: 'Affordable housing tenure', value: '100% managed by registered CHP (Housing SEPP cl. 97)', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Minimum frontage', value: '>=21 m with active frontage and deep soil', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
-          { label: 'Design excellence', value: 'Mandatory design review and excellence pathway', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
+          { label: 'Affordable housing tenure', value: '100% managed by registered CHP (Housing State Environmental Planning Policies cl. 97)', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Minimum frontage', value: '>=21 m with active frontage and deep soil', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing State Environmental Planning Policies Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
+          { label: 'Design excellence', value: 'Mandatory design review and excellence pathway', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
         ],
         setbacks: setbacks.apartment,
         constraints: [
@@ -1984,7 +2016,7 @@ export async function GET(request: Request) {
             label: '100% affordable housing bonus',
             fsr: 'Up to 1.5:1',
             height: '21 m',
-            trigger: 'Deliver 100% affordable dwellings under Housing SEPP Part 2 Division 4 Subdivision 2.'
+            trigger: 'Deliver 100% affordable dwellings under Housing State Environmental Planning Policies Part 2 Division 4 Subdivision 2.'
           }
         ],
         notes: [
@@ -1997,7 +2029,7 @@ export async function GET(request: Request) {
         ],
         clauses: [
           {
-            label: 'Housing SEPP 2021 - Part 2 Division 4 Subdivision 2',
+            label: 'Housing State Environmental Planning Policies 2021 - Part 2 Division 4 Subdivision 2',
             url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643#pt.2-div.4-subdiv.2'
           },
           {
@@ -2020,25 +2052,25 @@ export async function GET(request: Request) {
           !frontage21mSatisfied
             ? 'Frontage <21 m triggers amalgamation before Low and Mid-Rise townhouse uplift can proceed.'
             : isLmrBand
-              ? `Housing SEPP Transport Oriented Development (TOD) ${todBand.toLowerCase()} band townhouse typology`
+              ? `Housing State Environmental Planning Policies Transport Oriented Development (TOD) ${todBand.toLowerCase()} band townhouse typology`
               : townCentreBand !== 'N/A'
-                ? `Housing SEPP town centre ${townCentreBand.toLowerCase()} band townhouse typology`
+                ? `Housing State Environmental Planning Policies town centre ${townCentreBand.toLowerCase()} band townhouse typology`
                 : 'Outside mapped Low and Mid-Rise uplift areas - rely on Development Application (DA) merit pathway.',
         isPermitted: frontage21mSatisfied && (isLmrBand || townCentreBand !== 'N/A'),
         rationale:
           frontage21mSatisfied && (isLmrBand || townCentreBand !== 'N/A')
-            ? 'Housing SEPP Low and Mid-Rise provisions support three-to-four storey townhouse formats when frontage >=21 m and ADG townhouse benchmarks are achieved.'
+            ? 'Housing State Environmental Planning Policies Low and Mid-Rise provisions support three-to-four storey townhouse formats when frontage >=21 m and ADG townhouse benchmarks are achieved.'
             : 'Secure frontage amalgamation or await Housing Diversity mapping updates before relying on Low and Mid-Rise townhouse uplift.',
         zoneCompatibility:
           frontage21mSatisfied && (isLmrBand || townCentreBand !== 'N/A')
             ? 'Aligns with Transport Oriented Development (TOD)/town centre multi dwelling expectations subject to active transport and deep soil upgrades.'
             : 'Fallback to Section 3 Development Application (DA) pathways if Housing Diversity triggers are unavailable.',
         governingFactors: [
-          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
-          { label: 'Height baseline', value: '13 m (4 storeys) townhouse envelope', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Floor Space Ratio (FSR) baseline', value: '1.0:1 townhouse uplift target', source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing State Environmental Planning Policies Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
+          { label: 'Height baseline', value: '13 m (4 storeys) townhouse envelope', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Floor Space Ratio (FSR) baseline', value: '1.0:1 townhouse uplift target', source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'Depth', value: depthApprox },
           { label: 'Minimum lot size', value: areaApprox, source: { label: `${legacyPlan.lepName} - Lot Size Map`, url: lepUrl(legacyPlan.lotSizeSchedule) } }
         ],
@@ -2079,7 +2111,7 @@ export async function GET(request: Request) {
         ],
         clauses: [
           {
-            label: 'Housing SEPP 2021 - Low and Mid-Rise Housing',
+            label: 'Housing State Environmental Planning Policies 2021 - Low and Mid-Rise Housing',
             url: HOUSING_SEPP_LMR_URL
           },
           {
@@ -2097,20 +2129,20 @@ export async function GET(request: Request) {
         title: 'Complying Development Certificate (CDC) - Duplex',
         category: 'cdc',
         status: 'permitted',
-        permissibility: 'Codes SEPP Part 3A Dual Occupancies',
+        permissibility: 'Codes State Environmental Planning Policies Part 3A Dual Occupancies',
         isPermitted: true,
         rationale:
-          'Frontage and area satisfy Codes SEPP Part 3A enabling a complying development duplex subject to bushfire and flood certification where the local zoning permits dual occupancies.',
+          'Frontage and area satisfy Codes State Environmental Planning Policies Part 3A enabling a complying development duplex subject to bushfire and flood certification where the local zoning permits dual occupancies.',
         zoneCompatibility:
           'Duplex complying development supported where the LEP minimum lot size and frontage are met and hazards managed.',
         governingFactors: [
-          { label: 'Setbacks', value: 'Front 6 m, side 0.9 m, rear 3 m (Codes SEPP 3A)', source: { label: 'Codes SEPP Part 3A', url: CODES_SEPP_PART3A_URL } },
-          { label: 'Height', value: '8.5 m (LEP) / 2 storeys (Codes SEPP)', source: { label: 'Codes SEPP Part 3B', url: CODES_SEPP_PART3B_URL } },
+          { label: 'Setbacks', value: 'Front 6 m, side 0.9 m, rear 3 m (Codes State Environmental Planning Policies 3A)', source: { label: 'Codes State Environmental Planning Policies Part 3A', url: CODES_SEPP_PART3A_URL } },
+          { label: 'Height', value: '8.5 m (LEP) / 2 storeys (Codes State Environmental Planning Policies)', source: { label: 'Codes State Environmental Planning Policies Part 3B', url: CODES_SEPP_PART3B_URL } },
           { label: 'Floor Space Ratio (FSR)', value: '0.5:1 mapped', source: { label: `${legacyPlan.lepName} - FSR Map`, url: lepUrl(legacyPlan.fsrSchedule) } },
           { label: 'Minimum lot size', value: '600 m^2 (LEP standard)', source: { label: `${legacyPlan.lepName} - Lot Size Map`, url: lepUrl(legacyPlan.lotSizeSchedule) } },
-          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
+          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
         ],
         setbacks: setbacks.cdcDuplex,
         constraints: [
@@ -2135,7 +2167,7 @@ export async function GET(request: Request) {
         ],
         clauses: [
           {
-            label: 'Codes SEPP 2008 - Part 3A Dual Occupancies',
+            label: 'Codes State Environmental Planning Policies 2008 - Part 3A Dual Occupancies',
             url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572#pt.3A'
           },
           {
@@ -2149,19 +2181,19 @@ export async function GET(request: Request) {
         title: 'Complying Development Certificate (CDC) - Terraces',
         category: 'cdc',
         status: frontage21mSatisfied ? 'conditional' : 'prohibited',
-        permissibility: 'Codes SEPP Part 3B Terraces (subject to frontage)',
+        permissibility: 'Codes State Environmental Planning Policies Part 3B Terraces (subject to frontage)',
         isPermitted: frontage21mSatisfied,
         rationale:
-          'Codes SEPP Part 3B supports terrace housing where usable frontage >=21 m and hazards are managed. Site width should be validated via survey.',
+          'Codes State Environmental Planning Policies Part 3B supports terrace housing where usable frontage >=21 m and hazards are managed. Site width should be validated via survey.',
         zoneCompatibility:
           'Terrace Complying Development Certificate (CDC) can proceed where the zoning permits multi dwelling housing and frontage and services support up to three dwellings meeting Part 3B envelope.',
         governingFactors: [
-          { label: 'Frontage requirement', value: '>=21 m (Part 3B cl. 3B.4)', source: { label: 'Codes SEPP Part 3B', url: CODES_SEPP_PART3B_URL } },
+          { label: 'Frontage requirement', value: '>=21 m (Part 3B cl. 3B.4)', source: { label: 'Codes State Environmental Planning Policies Part 3B', url: CODES_SEPP_PART3B_URL } },
           { label: 'Minimum lot size', value: 'No explicit minimum; >600 m^2 preferred', source: { label: `${legacyPlan.lepName} - Lot Size Map`, url: lepUrl(legacyPlan.lotSizeSchedule) } },
-          { label: 'Setbacks', value: 'Front 5 m, rear 6 m, shared party wall (Codes SEPP 3B)', source: { label: 'Codes SEPP Part 3B', url: CODES_SEPP_PART3B_URL } },
-          { label: 'Height', value: '8.5 m (LEP) / 2 storeys (Codes SEPP)', source: { label: 'Codes SEPP Part 3B', url: CODES_SEPP_PART3B_URL } },
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Setbacks', value: 'Front 5 m, rear 6 m, shared party wall (Codes State Environmental Planning Policies 3B)', source: { label: 'Codes State Environmental Planning Policies Part 3B', url: CODES_SEPP_PART3B_URL } },
+          { label: 'Height', value: '8.5 m (LEP) / 2 storeys (Codes State Environmental Planning Policies)', source: { label: 'Codes State Environmental Planning Policies Part 3B', url: CODES_SEPP_PART3B_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'Depth', value: depthApprox }
         ],
         setbacks: setbacks.cdcTerrace,
@@ -2187,7 +2219,7 @@ export async function GET(request: Request) {
         ],
         clauses: [
           {
-            label: 'Codes SEPP 2008 - Part 3B Housing',
+            label: 'Codes State Environmental Planning Policies 2008 - Part 3B Housing',
             url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572#pt.3B'
           },
           {
@@ -2212,16 +2244,16 @@ export async function GET(request: Request) {
           { label: 'Height', value: '8.5 m mapped (Clause 4.3)', source: { label: `${legacyPlan.lepName} - Clause 4.3`, url: lepUrl('#cl.4.3') } },
           { label: 'Floor Space Ratio (FSR)', value: '0.5:1 (Clause 4.4)', source: { label: `${legacyPlan.lepName} - Clause 4.4`, url: lepUrl('#cl.4.4') } },
           { label: 'Minimum lot size', value: '600 m^2 (Clause 4.1C)', source: { label: `${legacyPlan.lepName} - Clause 4.1C`, url: lepUrl('#cl.4.1C') } },
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           (isLmrBand
             ? {
                 label: 'LMR uplift',
                 value: `${todBand} band bonuses available`,
                 note: 'Design excellence and frontage >=21 m unlock taller and denser outcomes.',
-                source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
+                source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
               }
             : { label: 'LMR uplift', value: 'Unavailable (outside LMR mapping)' }),
-          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
+          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } }
         ],
         setbacks: setbacks.daDuplex,
         constraints: [
@@ -2271,18 +2303,18 @@ export async function GET(request: Request) {
         zoneCompatibility:
           'Multi dwelling housing is merit-based; terraces must respond to neighbourhood context, landscaping, and parking supply under LEP/DCP.',
         governingFactors: [
-          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Frontage', value: frontageApprox, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           { label: 'Minimum frontage target', value: '>=21 m (DCP performance)', source: { label: legacyPlan.dcpName, url: legacyPlan.dcpUrl } },
           { label: 'Height', value: '8.5 m mapped (Clause 4.3)', source: { label: `${legacyPlan.lepName} - Clause 4.3`, url: lepUrl('#cl.4.3') } },
           { label: 'Floor Space Ratio (FSR)', value: '0.5:1 mapped (Clause 4.4)', source: { label: `${legacyPlan.lepName} - Clause 4.4`, url: lepUrl('#cl.4.4') } },
           { label: 'Parking', value: '2 spaces per dwelling (DCP baseline)', source: { label: legacyPlan.dcpName, url: legacyPlan.dcpUrl } },
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
           (isLmrBand
             ? {
                 label: 'LMR uplift',
                 value: `${todBand} band bonuses available`,
                 note: 'Design excellence may lift height to 13 m and FSR to 1.0:1.',
-                source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
+                source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
               }
             : { label: 'LMR uplift', value: 'Unavailable (outside LMR mapping)' })
         ],
@@ -2327,9 +2359,9 @@ export async function GET(request: Request) {
         status: todBand !== 'N/A' ? 'permitted' : townCentreBand !== 'N/A' ? 'conditional' : 'prohibited',
         permissibility:
           todBand !== 'N/A'
-            ? `Housing SEPP Low and Mid-Rise (Transport Oriented Development (TOD) ${todBand.toLowerCase()} band)`
+            ? `Housing State Environmental Planning Policies Low and Mid-Rise (Transport Oriented Development (TOD) ${todBand.toLowerCase()} band)`
             : townCentreBand !== 'N/A'
-              ? `Housing SEPP town centre ${townCentreBand.toLowerCase()} band`
+              ? `Housing State Environmental Planning Policies town centre ${townCentreBand.toLowerCase()} band`
               : 'Requires rezoning before apartments can be lodged',
         isPermitted: todBand !== 'N/A' || townCentreBand !== 'N/A',
         rationale:
@@ -2337,26 +2369,26 @@ export async function GET(request: Request) {
             ? 'Transport Oriented Development (TOD) mapping supports mid-rise apartments with frontage >=21 m, design excellence, and active transport upgrades.'
             : townCentreBand !== 'N/A'
               ? 'Town centre band enables apartment testing subject to ADG compliance and public domain uplift.'
-              : 'Outside Transport Oriented Development (TOD)/town centre mapping, apartments require planning proposal or SEPP amendment.',
+              : 'Outside Transport Oriented Development (TOD)/town centre mapping, apartments require planning proposal or State Environmental Planning Policies amendment.',
         zoneCompatibility: lmrZoneCompatibility,
         governingFactors: [
-          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
-          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing SEPP Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
+          { label: 'Transport Oriented Development (TOD) band', value: todBand, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'LMR uplift', value: `${todBand} band bonuses available`, source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL } },
+          { label: 'Town centre band', value: townCentreBand, source: { label: 'Housing State Environmental Planning Policies Town Centre provisions', url: HOUSING_SEPP_TOWN_CENTRE_URL } },
           {
             label: 'Frontage requirement',
-            value: '>=21 m (Housing SEPP baseline)',
-            source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
+            value: '>=21 m (Housing State Environmental Planning Policies baseline)',
+            source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
           },
           {
             label: 'Height baseline',
             value: '13 m (4 storeys) before bonuses',
-            source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
+            source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
           },
           {
             label: 'Floor Space Ratio (FSR) baseline',
             value: '1.0:1 (plus bonuses)',
-            source: { label: 'Housing SEPP Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
+            source: { label: 'Housing State Environmental Planning Policies Part 2 Div 4', url: HOUSING_SEPP_LMR_URL }
           },
           todBand !== 'N/A'
             ? {
@@ -2364,7 +2396,7 @@ export async function GET(request: Request) {
                 value: `${todBand} band bonuses available`,
                 note: 'Design excellence enables 18 m height and 1.2:1 FSR.',
                 source: {
-                  label: 'Housing SEPP 2021 - Low and Mid-Rise Housing',
+                  label: 'Housing State Environmental Planning Policies 2021 - Low and Mid-Rise Housing',
                   url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643#pt.2-div.4'
                 }
               }
@@ -2392,7 +2424,7 @@ export async function GET(request: Request) {
         setbacks: setbacks.apartment,
         constraints: [
           'Apartment Design Guide compliance across solar access, cross ventilation, deep soil, communal areas, and parking.',
-          'Maintain >=15% infill affordable dwellings to unlock Housing SEPP incentives outlined in Section 2 pathways.',
+          'Maintain >=15% infill affordable dwellings to unlock Housing State Environmental Planning Policies incentives outlined in Section 2 pathways.',
           'Design excellence process required for uplift; consider NSW Design Review Panel engagement.',
           'Coordinate infrastructure and public benefit (Voluntary Planning Agreement (VPA)) offers in line with Transport Oriented Development (TOD) or town centre expectations.'
         ],
@@ -2409,7 +2441,7 @@ export async function GET(request: Request) {
             label: 'Infill affordable housing bonus',
             fsr: 'Up to 1.2:1',
             height: '17 m',
-            trigger: 'Deliver >=15% infill affordable dwellings managed under Housing SEPP Part 2 Division 4.'
+            trigger: 'Deliver >=15% infill affordable dwellings managed under Housing State Environmental Planning Policies Part 2 Division 4.'
           }
         ],
         notes: [
@@ -2423,7 +2455,7 @@ export async function GET(request: Request) {
         ],
         clauses: [
           {
-            label: 'Housing SEPP 2021 - Low and Mid-Rise Housing',
+            label: 'Housing State Environmental Planning Policies 2021 - Low and Mid-Rise Housing',
             url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643'
           },
           {
@@ -2534,7 +2566,7 @@ export async function GET(request: Request) {
           'Advance the Complying Development Certificate (CDC)-ready duplex scheme with architectural, Building Sustainability Index (BASIX), bushfire and flood reporting so that a complying certificate can be issued immediately after due diligence.',
         sources: [
           {
-            label: 'Codes SEPP Part 3A Dual Occupancies',
+            label: 'Codes State Environmental Planning Policies Part 3A Dual Occupancies',
             url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2008-0572#pt.3A'
           }
         ]
@@ -2558,7 +2590,7 @@ export async function GET(request: Request) {
           'Model a 4-6 storey apartment concept aligned with Transport Oriented Development (TOD) design excellence criteria; validate deep soil, parking and infrastructure upgrades with NSW Planning.',
         sources: [
           {
-            label: 'Housing SEPP Low and Mid-Rise Housing',
+            label: 'Housing State Environmental Planning Policies Low and Mid-Rise Housing',
             url: 'https://legislation.nsw.gov.au/view/html/inforce/current/epi-2021-0643'
           }
         ]
@@ -2567,7 +2599,7 @@ export async function GET(request: Request) {
         category: 'High Risk / Likely Refusal',
         title: 'Apartments without Transport Oriented Development (TOD) / town centre mapping',
         detail:
-          'Outside Transport Oriented Development (TOD)/town centre activation apartments face refusal-pursue planning proposal or await Housing SEPP commencement before lodging.',
+          'Outside Transport Oriented Development (TOD)/town centre activation apartments face refusal-pursue planning proposal or await Housing State Environmental Planning Policies commencement before lodging.',
         sources: [
           {
             label: 'NSW Planning - Transport Oriented Development (TOD) Program',
@@ -2683,7 +2715,7 @@ export async function GET(request: Request) {
         'Deliver Complying Development Certificate (CDC) duplex immediately while progressing Transport Oriented Development (TOD)/town centre uplift investigations.',
       status: 'Go (conditional)',
       rationalePoints: [
-        'Codes SEPP duplex pathway is compliant with frontage, area, and hazard certification.',
+        'Codes State Environmental Planning Policies duplex pathway is compliant with frontage, area, and hazard certification.',
         `Transport Oriented Development (TOD) / town centre mapping offers apartment upside subject to design excellence (${todBand} Transport Oriented Development (TOD) band, ${townCentreBand} town centre band).`,
         townCentreSummary,
         'Market evidence supports duplex pricing above $2.3m per dwelling, reinforcing baseline feasibility.'
@@ -2695,7 +2727,7 @@ export async function GET(request: Request) {
       ],
       risks: [
         'Flood, overland flow and bushfire certification required to retain Complying Development Certificate (CDC) eligibility.',
-        'Transport Oriented Development (TOD) uplift contingent on Housing SEPP commencement-monitor mapping and policy updates.'
+        'Transport Oriented Development (TOD) uplift contingent on Housing State Environmental Planning Policies commencement-monitor mapping and policy updates.'
       ],
       confidenceRating: 'High (80%)'
     };
@@ -2797,7 +2829,7 @@ export async function GET(request: Request) {
             url: 'https://www.corelogic.com.au/'
           },
           {
-            label: 'Housing SEPP Low and Mid-Rise Housing Guidance',
+            label: 'Housing State Environmental Planning Policies Low and Mid-Rise Housing Guidance',
             url: 'https://www.planning.nsw.gov.au/policy-and-legislation/housing/low-and-mid-rise-housing-policy'
           }
         ]
