@@ -1,0 +1,133 @@
+{
+  "input": {
+    "query_type": "address",
+    "raw_input": "3 Nield Avenue, Balgowlah NSW 2093",
+    "resolved_address": "3 Nield Avenue, Balgowlah NSW 2093",
+    "resolved_lot_plan": "Lot 2 DP228402",
+    "resolved_coordinates": { "lat": -33.7902, "lon": 151.2618 }
+  },
+  "parcel": {
+    "lot_number": "2",
+    "plan_number": "228402",
+    "plan_type": "DP",
+    "rpd": "Lot 2 DP228402",
+    "parcel_type": "Lot",
+    "area_sqm": 607,
+    "source_dataset": "NSW_DCDB_2025Q1",
+    "spatial_accuracy_code": "SC2"
+  },
+  "geometry": {
+    "coordinate_reference_system": "EPSG:7856",
+    "polygon": {
+      "type": "Polygon",
+      "coordinates": [[[360400, 6259000], [360415, 6259000], [360415, 6258960], [360400, 6258960], [360400, 6259000]]]
+    },
+    "centroid": { "lat": -33.79021, "lon": 151.26179 },
+    "boundaries": {
+      "front": { "length_m": 15.0, "orientation_deg": 90, "num_segments": 1 },
+      "rear": { "length_m": 15.0, "orientation_deg": 270, "num_segments": 1 },
+      "sides": [
+        { "name": "left", "length_m": 40, "orientation_deg": 0 },
+        { "name": "right", "length_m": 40, "orientation_deg": 0 }
+      ],
+      "perimeter_m": 110
+    },
+    "frontage_m": 15.0,
+    "depth_m": 40,
+    "regularity_index": 0.96,
+    "is_corner_lot": false
+  },
+  "spatial_context": {
+    "adjacent_parcels": [
+      { "lot_plan": "Lot 1 DP228402", "relationship": "side" },
+      { "lot_plan": "Lot 3 DP228402", "relationship": "side" }
+    ],
+    "nearest_road": {
+      "name": "Nield Avenue",
+      "road_class": "local",
+      "distance_m": 0.0,
+      "is_primary_frontage": true
+    },
+    "road_reserve_width_m": 12,
+    "centre_access": {
+      "nearest_centre_name": "Balgowlah Local Centre",
+      "distance_m": 530,
+      "inner_ring_400m": false,
+      "outer_ring_800m": true
+    }
+  },
+  "administrative": {
+    "lga_name": "Northern Beaches Council",
+    "locality": "Balgowlah",
+    "ward": "Manly Ward",
+    "planning_authority": "Northern Beaches Council",
+    "planning_instruments": [
+      { "code": "NBLEP", "name": "Northern Beaches LEP", "version": "2023" },
+      { "code": "SEPP_HOUSING_CH6", "name": "Housing SEPP Ch. 6", "version": "2024" }
+    ],
+    "zone": {
+      "code": "R1",
+      "name": "General Residential",
+      "instrument": "Northern Beaches LEP"
+    }
+  },
+  "constraints": {
+    "bushfire_prone": true,
+    "bushfire_category": "Vegetation Category 1",
+    "flood_prone": false,
+    "acid_sulfate_soil_class": "Class 3",
+    "heritage_item": false,
+    "heritage_conservation_area": false,
+    "foreshore_building_line": false,
+    "riparian_buffer": false,
+    "biodiversity": false,
+    "geotech_landslip_risk": "Low",
+    "other_overlays": []
+  },
+  "development_metrics": {
+    "slope": {
+      "mean_gradient_percent": 6.5,
+      "max_gradient_percent": 12.0,
+      "primary_fall_direction_deg": 180,
+      "falls_to_street": true
+    },
+    "envelope": {
+      "max_height_m": 8.5,
+      "fsr_control": 0.6,
+      "max_gfa_sqm": 364.2,
+      "front_setback_m": 6,
+      "rear_setback_m": 6,
+      "side_setback_min_m": 0.9,
+      "deep_soil_required_sqm": 90.0,
+      "landscaped_area_required_sqm": 180.0
+    },
+    "yield": {
+      "dual_occ_feasible": true,
+      "terrace_row_feasible": false,
+      "manor_house_feasible": false,
+      "multi_dwelling_feasible": false,
+      "indicative_dwellings_count": 2,
+      "notes": "Standard R1 duplex envelope with compliant width, depth and FSR."
+    }
+  },
+  "feasibility": {
+    "cdc_potential": {
+      "is_potentially_cdc_compliant": false,
+      "likely_pathway": "DA Only",
+      "blocking_constraints": ["Bushfire (BAL > 40 requires report)"]
+    },
+    "da_potential": {
+      "is_likely_supportable": true,
+      "key_issues": ["Bushfire vegetation setback", "Streetscape bulk & scale"],
+      "recommended_studies": ["Bushfire Assessment Report"]
+    },
+    "overall_risk_rating": "Medium",
+    "notes": "Solid R1 duplex site. CDC unlikely due to bushfire. DA feasible with BAL and stormwater design."
+  },
+  "metadata": {
+    "generated_at_utc": "2025-11-18T01:00:00Z",
+    "engine_version": "1.0.0",
+    "source_system": "DevGPT-v1",
+    "data_snapshots": [{ "dataset_name": "NSW_DCDB", "version": "2025Q1" }]
+  }
+}
